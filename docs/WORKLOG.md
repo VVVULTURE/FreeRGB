@@ -52,7 +52,10 @@ profiles, settings, platform helpers, Avalonia UI with tray, diagnostics, `--dia
 6. HKCU Run entry write/read/delete round-trip (unit test, with a throwaway value name).
 
 Not done: visually confirming the tray icon and clicking its menu; an actual sign-out/sign-in cycle.
-Linux: nothing run locally. CI builds, tests, and starts the published binary under xvfb (see Actions).
+Linux: nothing run locally. ✔ GitHub Actions (ubuntu-latest, run on commit "docs: correct test count"): build OK,
+**47/47 tests pass on Linux** (including the single-instance pipe test), trimmed `linux-x64` publish OK, and the published
+binary was still running after 8 s under `xvfb-run` (UI process starts; says nothing about tray, autostart or devices).
+Windows runner: build OK, 47/47 tests pass.
 
 ## Phase 6: performance
 

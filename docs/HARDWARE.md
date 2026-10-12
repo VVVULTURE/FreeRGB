@@ -51,7 +51,7 @@ CPU coolers/pumps · keyboards · mice · headsets · mousepads · other USB acc
 | Platform | Built | Unit tests | App launched | Tray / autostart | Notes |
 |---|---|---|---|---|---|
 | Windows 11 (dev machine) | yes | yes | yes | see `docs/WORKLOG.md` | Single-instance behaviour verified manually. |
-| Linux x64 | CI only | CI only | CI headless smoke test only | **unverified** | No Linux machine/VM available to the author. Tray requires a StatusNotifier host; autostart writes `~/.config/autostart/freergb.desktop`. |
+| Linux x64 | yes (CI, ubuntu-latest) | yes, 47/47 (CI) | CI: still running after 8 s under xvfb | **unverified** | No Linux machine/VM available to the author. Tray requires a StatusNotifier host; autostart writes `~/.config/autostart/freergb.desktop`. |
 
 ## Permissions & drivers (all handled by OpenRGB, not FreeRGB)
 

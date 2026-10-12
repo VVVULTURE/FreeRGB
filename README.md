@@ -96,7 +96,7 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 
 | Verified | Evidence |
 |---|---|
-| 47 automated tests pass (Windows) | `dotnet test` |
+| 47 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
 | Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates (0 devices on the dev machine) | `FreeRGB --diagnose` |
 | Windows 11: app starts; `--minimized` shows no window; second launch raises the existing window; close-to-tray hides, tray-off exits cleanly and releases the lock | scripted run, worklog |
 | Windows 11: HKCU Run entry written/removed correctly | unit test |
@@ -105,7 +105,7 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 | **Not** verified | |
 |---|---|
 | Any real RGB device controlled through FreeRGB | none yet |
-| Linux UI, tray, autostart, permissions | only built/tested/started headless in CI |
+| Linux UI, tray, autostart, permissions | CI only builds, runs the tests, and starts the binary under a virtual display |
 | Tray menu clicks (visual check) | not done |
 | Behaviour while another RGB program actively manages a device | not tested |
 
