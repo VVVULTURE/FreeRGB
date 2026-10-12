@@ -4,7 +4,7 @@
 dotnet test FreeRGB.slnx
 ```
 
-## What the automated tests cover (48 tests, xUnit)
+## What the automated tests cover (47 tests, xUnit)
 
 All hardware-facing tests run against `FakeOpenRgbServer`, an in-process **simulation** of an OpenRGB SDK server.
 They prove FreeRGB's protocol handling and logic. They do **not** prove any real device works.

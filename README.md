@@ -96,7 +96,7 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 
 | Verified | Evidence |
 |---|---|
-| 48 automated tests pass (Windows) | `dotnet test` |
+| 47 automated tests pass (Windows) | `dotnet test` |
 | Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates (0 devices on the dev machine) | `FreeRGB --diagnose` |
 | Windows 11: app starts; `--minimized` shows no window; second launch raises the existing window; close-to-tray hides, tray-off exits cleanly and releases the lock | scripted run, worklog |
 | Windows 11: HKCU Run entry written/removed correctly | unit test |
