@@ -89,6 +89,12 @@ build PawnIO/other dependencies into FreeRGB.
 * RAM test (2 x ENE DRAM, via FreeRGB.HwTest, owner watching): static colours, dim white, off, orange, Spectrum Cycle, Breathing seen;
   first report had off/orange swapped, retest in 8 s steps matched exactly. See docs/HARDWARE.md.
 
+* **GUI crash found on first real-device launch:** `NullReferenceException` in the device-list template (Avalonia built the template with a
+  null item) killed the app moments after it appeared (WER event + stack trace in the Application log). Earlier GUI runs had no devices so
+  never hit it. Fixed with a null guard; an unhandled-exception logger now writes to `freergb.log`. Re-checked: the app stays up with 4
+  devices, selecting the ASRock board works, the Zones section renders. Zones moved directly under Effect and opens by default.
+  Lesson: GUI had only been tested with an empty device list before.
+
 ## Phase 5: OS integration (Windows ✔, Linux unverified)
 
 ✔ (scripted, Windows 11, final code):

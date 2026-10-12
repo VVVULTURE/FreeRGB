@@ -39,6 +39,7 @@ public partial class MainWindow : Window
 
         DeviceList.ItemTemplate = new FuncDataTemplate<DeviceRow>((row, _) =>
         {
+            if (row is null) return new TextBlock(); // Avalonia may build the template with no item
             var name = new TextBlock { Text = row.Name, FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
             var sub = new TextBlock { Text = row.Subtitle, FontSize = 12, Opacity = 0.7, TextTrimming = TextTrimming.CharacterEllipsis };
             return new Grid

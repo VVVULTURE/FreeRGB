@@ -22,6 +22,8 @@ internal static class Program
         }
 
         Log.Info($"Starting. args=[{string.Join(' ', args)}]");
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Unhandled exception", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (_, e) => Log.Error("Unobserved task exception", e.Exception);
         AppHost.Instance = new AppHost(dataDir, args, instance);
         return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args, Avalonia.Controls.ShutdownMode.OnExplicitShutdown);
     }

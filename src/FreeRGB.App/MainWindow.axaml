@@ -63,6 +63,9 @@
                   <TextBlock Text="Effect" />
                   <ComboBox x:Name="EffectBox" MinWidth="260" />
                 </StackPanel>
+                <Expander x:Name="ZoneExpander" Header="Zones" IsVisible="False" IsExpanded="True">
+                  <StackPanel x:Name="ZoneList" Spacing="6" Margin="0,6,0,0" />
+                </Expander>
                 <StackPanel x:Name="ColorPanel" Spacing="6">
                   <TextBlock Text="Colour" />
                   <ColorView x:Name="Picker" IsAlphaVisible="False" IsColorSpectrumVisible="True" IsColorPaletteVisible="False" IsColorComponentsVisible="True" IsColorModelVisible="False" IsHexInputVisible="False" Width="300" HorizontalAlignment="Left" />
@@ -79,9 +82,6 @@
                   <TextBlock x:Name="SpeedLabel" Text="Speed" />
                   <Slider x:Name="SpeedSlider" Minimum="0" Maximum="100" Width="360" HorizontalAlignment="Left" />
                 </StackPanel>
-                <Expander x:Name="ZoneExpander" Header="Zones" IsVisible="False">
-                  <StackPanel x:Name="ZoneList" Spacing="6" Margin="0,6,0,0" />
-                </Expander>
               </StackPanel>
             </StackPanel>
           </ScrollViewer>
