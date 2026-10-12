@@ -53,10 +53,16 @@ driver (one-time administrator approval); on Linux, udev rules (and `i2c-dev` fo
 
 ## Install & run
 
-No packaged release has been published yet. Build from source (below), or download the CI build artifacts for
-`win-x64` / `linux-x64` from the GitHub Actions run of the latest commit (self-contained, no .NET install needed).
+Download from the [**Releases**](https://github.com/VVVULTURE/FreeRGB/releases) page (verify with `SHA256SUMS.txt`):
 
-1. Windows: run `FreeRGB.exe`, open *Settings → Hardware setup* and click the button. Linux: install OpenRGB and start `OpenRGB --server`, then run `./FreeRGB`.
+| Platform | Portable | Installer |
+|---|---|---|
+| Windows 11 (x64) | `FreeRGB-<version>-win-x64-portable.exe` (single file) | `FreeRGB-<version>-win-x64-setup.exe` (per-user, no admin) |
+| Linux (x64) | `FreeRGB-<version>-linux-x64.AppImage` (`chmod +x` and run), or the `.tar.gz` | `freergb_<version>_amd64.deb` (`sudo apt install ./freergb_*.deb`) |
+
+The Windows files are not code-signed, so SmartScreen may warn on first run.
+
+1. Windows: run FreeRGB, open *Settings \u2192 Hardware setup* and click the button. Linux: install OpenRGB and start `OpenRGB --server`, then run FreeRGB.
 2. Pick a device, set colours/effects. Addressable headers: enter the LED count under *Zones*.
 
 ### Start at sign-in
@@ -96,11 +102,10 @@ dotnet publish src/FreeRGB.App -c Release -r win-x64   --self-contained -p:Publi
 dotnet publish src/FreeRGB.App -c Release -r linux-x64 --self-contained -p:PublishTrimmed=true -p:TrimMode=partial -o publish/linux-x64
 ```
 
-Release process: tag `vX.Y.Z`, let CI build both artifacts, attach them to a GitHub Release. (Not done yet.)
+Releases: push a tag `vX.Y.Z` and the *Release* workflow builds, smoke-tests and publishes everything — see [docs/RELEASING.md](docs/RELEASING.md).
 
-Linux packaging: a self-contained directory/tarball for now. AppImage / Flatpak were considered and **not** implemented
-(Flatpak sandboxing would need explicit device and session-bus permissions that haven't been validated; AppImage
-needs a Linux machine to test). Contributions welcome.
+Linux packaging: AppImage, `.deb` and tarball are built by CI. Flatpak was considered and **not** implemented (its sandbox would need
+explicit device and session-bus permissions that haven't been validated). Contributions welcome.
 
 ## Verified & unverified
 
@@ -137,4 +142,4 @@ Imported profiles are size-limited and validated. See [SECURITY.md](SECURITY.md)
 
 ## License
 
-[MIT](LICENSE). Dependencies: Avalonia (MIT). OpenRGB (GPL-2.0-or-later) is an external program, not bundled.
+[MIT](LICENSE) — permissive, and compatible with every bundled component (see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)). OpenRGB (GPL-2.0-or-later) is an external program that FreeRGB talks to over a network protocol; it is not bundled.

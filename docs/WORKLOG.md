@@ -111,6 +111,15 @@ build PawnIO/other dependencies into FreeRGB.
 * Case fans: no board header reaches them, no USB RGB controller in `Get-PnpDevice` (only mouse, keyboard, headset, ASRock LED chip,
   fingerprint reader, BT radio, storage), no case button, lighting cable goes straight to Molex => fixed-colour fans, not software-controllable.
 
+### Update - release packaging
+
+`.github/workflows/release.yml` (tag `v*` -> release; manual run = dry run). First dry run failed in both smoke tests, which is
+what they are for: (1) Windows step reported failure only because `--diagnose` exits 1 without OpenRGB and PowerShell carried that
+exit code; (2) in a bare ubuntu:24.04 container `ldd` flagged `liblttng-ust.so.0` (optional .NET tracing lib; the app ran fine) -> check now
+ignores that one library. Second run all green: portable exe runs, Inno installer silent install/run/uninstall, tar.gz and
+AppImage run (AppImage GUI up for 8 s under xvfb), .deb installs/runs/removes in a bare container. Licence: kept MIT (no OpenRGB code is
+linked; all bundled packages are MIT/BSD, see THIRD-PARTY-NOTICES.md). Not signed; not tested on a real Linux desktop.
+
 ## Phase 5: OS integration (Windows ✔, Linux unverified)
 
 ✔ (scripted, Windows 11, final code):
