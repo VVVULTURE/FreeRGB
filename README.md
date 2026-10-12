@@ -4,9 +4,10 @@ A free, open-source, lightweight RGB lighting controller for **Windows 11** and 
 pick a device, pick a colour or effect, done. No account, no telemetry, no manufacturer-specific app per component.
 
 > **Status: early / pre-release.** The application, profile system, tray/startup behaviour and OpenRGB integration are
-> implemented and tested against a *simulated* OpenRGB server and a real OpenRGB 1.0 server. **No physical RGB device
-> has been verified through FreeRGB yet** — see [Verified & unverified](#verified--unverified) and
-> [docs/HARDWARE.md](docs/HARDWARE.md). Don't treat any hardware as supported until it appears as *Verified* there.
+> implemented and tested against a *simulated* OpenRGB server and a real OpenRGB 1.0 server. **Exactly one physical
+> device (Logitech G502 HERO) has been hardware-verified so far**, through the Core API rather than the GUI — see
+> [Verified & unverified](#verified--unverified) and [docs/HARDWARE.md](docs/HARDWARE.md). Don't treat any other hardware
+> as supported until it appears as *Verified* there.
 
 ## What it does
 
@@ -96,15 +97,16 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 
 | Verified | Evidence |
 |---|---|
-| 47 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
-| Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates (0 devices on the dev machine) | `FreeRGB --diagnose` |
+| 48 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
+| Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates devices | `FreeRGB --diagnose` |
+| Logitech G502 HERO: static colours, brightness, off, zones, Spectrum Cycle, Breathing, as seen by the owner | [docs/HARDWARE.md](docs/HARDWARE.md) |
 | Windows 11: app starts; `--minimized` shows no window; second launch raises the existing window; close-to-tray hides, tray-off exits cleanly and releases the lock | scripted run, worklog |
 | Windows 11: HKCU Run entry written/removed correctly | unit test |
 | Idle / effect CPU & memory | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |
 
 | **Not** verified | |
 |---|---|
-| Any real RGB device controlled through FreeRGB | none yet |
+| Any other real device (ASRock board LEDs, RAM, GPU, headset); any hardware via the GUI | not done |
 | Linux UI, tray, autostart, permissions | CI only builds, runs the tests, and starts the binary under a virtual display |
 | Tray menu clicks (visual check) | not done |
 | Behaviour while another RGB program actively manages a device | not tested |

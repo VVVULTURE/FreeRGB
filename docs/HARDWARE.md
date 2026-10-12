@@ -18,19 +18,41 @@ Simulated hardware (the test suite's fake OpenRGB server) is **never** counted a
 
 ## Verified hardware
 
-*None yet.* No physical device has been successfully controlled through FreeRGB. See `docs/WORKLOG.md` for what has
-been checked and why (summary: on the only dev machine a real OpenRGB 1.0 server connected and negotiated protocol 5,
-but reported 0 devices while SignalRGB and Logitech G HUB were running).
+Test setup for every row: Windows 11 Pro 10.0.26200 · OpenRGB 1.0 (commit 81bbe18, SDK protocol 5) run as a normal user in
+headless server mode, **without** the PawnIO driver · FreeRGB's `LightingService` driven by `tools/FreeRGB.HwTest`
+(the real Core code, not the GUI) · results are what the owner **saw with their own eyes** (OpenRGB has no read-back).
+Date 2026-10-12.
 
-## Dev-machine inventory (all **Untested**)
+| Manufacturer / model | Revision / firmware | Connection | Backend | Verified (observed) | Not verified / limits |
+|---|---|---|---|---|---|
+| Logitech G502 HERO | not reported by OpenRGB | USB HID `046D:C08B` | OpenRGB 1.0 SDK | static red, green, blue, orange, white; brightness scaling (25 % white visibly dim); lighting **off**; per-zone colours (Primary / Logo zones different); hardware **Spectrum Cycle**; hardware **Breathing** (red), after fixing a bug found by this test | software "Rainbow": a cycling rainbow incl. the side lights was seen, but the owner could not tell it apart from Spectrum Cycle, so it is not separately confirmed. GUI not used for this run. Speed slider not checked visually. |
 
-Identified from Windows device enumeration; none have been controlled through FreeRGB yet.
+Status: **Verified** for the features in the "Verified" column; everything else **Untested**.
+
+### What the first hardware pass found
+
+* With the SignalRGB app running, OpenRGB found **0 devices**; with it closed, OpenRGB registered both the G502 HERO and the
+  ASRock board. "Only one program can drive a device" is a real, observed constraint on this machine.
+* Hardware *Breathing* on the G502 is a per-LED-colour mode; FreeRGB wasn't sending the colour for such modes, so it
+  breathed black. Fixed in `LightingService` (+ unit test `PerLedColourEffectSendsColourViaLeds`) and re-verified visually.
+* OpenRGB shows a "PawnIO failed to initialize" dialog on start without the PawnIO driver. That is OpenRGB's own dialog.
+  **Fix applied on the dev machine:** `winget install namazso.PawnIO` (PawnIO 2.2.0, installer hash verified by winget,
+  one UAC prompt), then start OpenRGB **elevated** (it needs administrator rights to open the driver). Result: the dialog
+  is gone, OpenRGB's log shows "PawnIO initialized successfully" for the Intel i801 SMBus and the previously invisible
+  **two ENE DRAM modules** are now detected (I2C 0x70 and 0x72). FreeRGB itself still runs unelevated and talks to the
+  elevated OpenRGB over loopback. (OpenRGB logs two harmless errors for the `SmbusIntelSkylakeIMC` module, which does
+  not apply to this CPU.) Trade-off: PawnIO is a third-party freeware kernel driver, and an elevated OpenRGB means a UAC
+  prompt at each start unless you run it as a service/scheduled task, which FreeRGB does not set up for you.
+
+## Dev-machine inventory
+
+Identified from Windows device enumeration. Only the G502 HERO has a verified result.
 
 | Device | Category | Connection | Notes |
 |---|---|---|---|
-| ASRock B760M-HDV/M.2 | Motherboard | USB HID `26CE:01A2` appears present (ASRock) | OpenRGB lists an "ASRock Polychrome USB" detector, enabled by default. Not detected in the one run so far. |
-| Team Group T-Force UD5-5600 ×2 | RAM | SMBus/I²C | Windows SMBus access needs OpenRGB's PawnIO driver, which was **not** installed on the dev machine. Untested. |
-| Logitech G502 HERO | Mouse | USB HID `046D:C08B` | OpenRGB lists "Logitech G502 HERO Gaming Mouse". Not detected in the one run so far. |
+| ASRock B760M-HDV/M.2 | Motherboard | USB HID `26CE:01A2` | OpenRGB registered it (162 LEDs, 4 zones: 2 RGB headers, 2 addressable headers with 80 LEDs each) and accepted every FreeRGB command, but nothing visible is connected to the headers on the dev machine, so there is no visual result. Untested. |
+| Team Group T-Force UD5-5600 ×2 | RAM | SMBus/I²C | After installing PawnIO, OpenRGB detects two "ENE DRAM" controllers (FreeRGB lists them, controllable). **No lighting command has been sent to them yet**, so Untested. |
+| Logitech G502 HERO | Mouse | USB HID `046D:C08B` | **Verified** (see above). |
 | Logitech G432 headset | Headset | USB HID `046D:0A9C` | No matching OpenRGB detector name seen in its list. Untested. |
 | NVIDIA GeForce RTX 5070 | GPU | NVAPI I²C | OpenRGB registered an "Nvidia NvAPI I2C" interface for it; no device reported. Untested. |
 

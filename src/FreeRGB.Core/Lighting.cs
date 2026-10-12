@@ -158,7 +158,7 @@ public sealed class LightingService : IAsyncDisposable
         if (SoftwareEffects.IsSoftware(effect)) return (true, true, effect is SoftwareEffects.Breathing or SoftwareEffects.Wave);
         if (effect == EffectNames.Static) return (false, true, true);
         var m = d.Modes.FirstOrDefault(x => x.Name.Equals(effect, StringComparison.OrdinalIgnoreCase));
-        return m is null ? (false, false, false) : (m.HasSpeed, m.HasBrightness, m.HasModeColor);
+        return m is null ? (false, false, false) : (m.HasSpeed, m.HasBrightness, m.HasModeColor || m.ColorMode == ColorMode.PerLed);
     }
 
     public async Task<ApplyResult> ApplyDeviceAsync(DeviceInfo d, CancellationToken ct = default)
@@ -229,6 +229,13 @@ public sealed class LightingService : IAsyncDisposable
             else hw.Colors[0] = color;
         }
         await _backend.SetModeAsync(d, d.Modes.IndexOf(mode), hw, ct);
+        // Per-LED-colour modes (e.g. Breathing on some mice) take their colour from the LED colours, not from the mode.
+        if (hw.ColorMode == ColorMode.PerLed && d.LedCount > 0)
+        {
+            var frame = new Rgb[d.LedCount];
+            Array.Fill(frame, color);
+            await _backend.SetLedsAsync(d, frame, ct);
+        }
         return new(d.Id, true, $"{d.Name}: {s.Effect}.");
     }
 

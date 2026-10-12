@@ -235,6 +235,22 @@ public class LightingTests
     }
 
     [Fact]
+    public async Task PerLedColourEffectSendsColourViaLeds()
+    {
+        var dev = FakeOpenRgbServer.SampleStripWithStatic();
+        dev.Modes.Add(new ModeInfo { Name = "Breathing", Flags = ModeFlags.HasSpeed | ModeFlags.HasPerLedColor, SpeedMin = 200, SpeedMax = 10, Speed = 100, ColorMode = ColorMode.PerLed });
+        var (srv, b, svc) = await Setup(dev);
+        await using var _s = srv; await using var _b = b; await using var _l = svc;
+        var d = b.Devices[0];
+        var st = svc.GetOrCreateSetting(d); st.Effect = "Breathing"; st.Color = "#FF0000";
+        Assert.True((await svc.ApplyDeviceAsync(d)).Ok);
+        await BackendTests.WaitFor(() => srv.Snapshot().Any(p => p.Pkt == OpenRgbProtocol.UpdateLeds));
+        var leds = srv.Snapshot().Last(p => p.Pkt == OpenRgbProtocol.UpdateLeds).Payload;
+        Assert.Equal(new byte[] { 255, 0, 0, 0 }, leds[6..10]);
+        Assert.True(LightingService.ControlsFor(d, "Breathing").Color);
+    }
+
+    [Fact]
     public async Task UnsupportedEffectIsRejectedNotSent()
     {
         var (srv, b, svc) = await Setup(FakeOpenRgbServer.SampleStripWithStatic());

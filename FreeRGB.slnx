@@ -7,6 +7,7 @@
     <Project Path="tests/FreeRGB.Tests/FreeRGB.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/FreeRGB.HwTest/FreeRGB.HwTest.csproj" />
     <Project Path="tools/FreeRGB.SimServer/FreeRGB.SimServer.csproj" />
   </Folder>
 </Solution>

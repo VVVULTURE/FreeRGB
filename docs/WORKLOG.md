@@ -38,8 +38,29 @@ profiles, settings, platform helpers, Avalonia UI with tray, diagnostics, `--dia
   enabled. SMBus access failed as expected ("Could not open PawnIO") so RAM/motherboard-SMBus devices were not
   probed. **Likely cause (unconfirmed):** SignalRGB and/or Logitech G HUB hold those HID devices. Confirming requires
   closing them; not done without the owner's go-ahead.
-* **No command has been written to any physical device** at any point so far.
-* Hardware results therefore: **nothing verified.** See `docs/HARDWARE.md`.
+* In this first pass no command had been written to any physical device.
+* Hardware results from this first pass: nothing verified. (Superseded by the update below.)
+
+### Update - real hardware (same day, after the owner approved closing SignalRGB / G HUB)
+
+The SignalRGB app turned out to be already closed (only its Windows service remained; left untouched. G HUB left running).
+With it closed: OpenRGB registered "G502 HERO Gaming Mouse" and "ASRock B760M-HDV/M.2", and `FreeRGB --diagnose` listed both with
+real modes (G502 speed range `200..10`, the inverted-range case the unit test had caught). `tools/FreeRGB.HwTest` then ran
+a sequence through `LightingService`; every command returned OK, and the owner watched the mouse:
+* Seen: static green / blue / dim white / orange, per-zone colours, a cycling rainbow; in a retest: red, white, off.
+* **Not seen: hardware Breathing -> bug.** Breathing is a per-LED-colour mode and FreeRGB never sent its colour. Fixed,
+  unit test added, re-verified visually (red breathing). Spectrum Cycle seen.
+* A first run was missed (owner not watching) and one retest was invalid because the harness left the light switched off;
+  both were repeated. OpenRGB exited by itself between runs twice (cause unknown; possibly its warning dialog being closed).
+* ASRock board: commands accepted, nothing visibly connected to its headers, so no visual verification.
+* Device state restored after every run (G502 back to mode "Off"; ASRock back to "Direct" with its original colours).
+* Not confirmed by eye: software Rainbow distinct from Spectrum Cycle; the speed slider.
+
+### Update - PawnIO / SMBus (owner asked to fix OpenRGB's PawnIO warning dialog)
+
+`winget install namazso.PawnIO` -> PawnIO 2.2.0 installed, service `PawnIO` Running (UAC approved by the owner). OpenRGB
+restarted elevated (UAC approved). Log: "PawnIO initialized successully" (SmbusI801, SmbusNCT6793), no warning dialog.
+`FreeRGB --diagnose` now lists 4 devices: 2x ENE DRAM (I2C 0x70/0x72), G502 HERO, ASRock board. No commands were sent to the RAM.
 
 ## Phase 5: OS integration (Windows ✔, Linux unverified)
 
@@ -73,8 +94,7 @@ fixed; re-run is flat.
 
 ## Known limitations / open questions
 
-* No physical device verified (see above). Needs: close SignalRGB / G HUB (or find a machine without them), rerun
-  `FreeRGB --diagnose`, then test one device end to end.
+* Only the G502 HERO is hardware-verified, and through the Core API, not the GUI. Not verified: ASRock board LEDs (nothing connected), RAM, GPU (need PawnIO / admin), headset.
 * Linux UI, tray (needs a StatusNotifier host), autostart and udev behaviour unverified.
 * Windows: tray icon visuals/menu clicks and a real sign-in autostart unverified.
 * Rescan resource cost not measured.
