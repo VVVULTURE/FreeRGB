@@ -235,6 +235,30 @@ public class LightingTests
     }
 
     [Fact]
+    public async Task PerLedStaticModeIsPreferredOverSingleShotDirect()
+    {
+        // Mirrors the ASRock Polychrome USB board: Direct needs a stream, hardware Static (per-LED colour) holds the colour.
+        var dev = FakeOpenRgbServer.SampleStripWithStatic();
+        dev.Modes.RemoveAll(m => m.Name == "Static");
+        dev.Modes.Add(new ModeInfo { Name = "Static", Flags = ModeFlags.HasPerLedColor, ColorMode = ColorMode.PerLed });
+        var (srv, b, svc) = await Setup(dev);
+        await using var _s = srv; await using var _b = b; await using var _l = svc;
+        var d = b.Devices[0];
+        svc.GetOrCreateSetting(d).Color = "#00FF00";
+        Assert.True((await svc.ApplyDeviceAsync(d)).Ok);
+        await BackendTests.WaitFor(() => srv.Snapshot().Any(p => p.Pkt == OpenRgbProtocol.UpdateLeds));
+        var modes = srv.Snapshot().Where(p => p.Pkt == OpenRgbProtocol.UpdateMode).ToArray();
+        Assert.Single(modes);
+        Assert.Equal(d.Modes.FindIndex(m => m.Name == "Static"), BinaryPrimitives.ReadInt32LittleEndian(modes[0].Payload.AsSpan(4)));
+        // and "off" goes through the same colour path (black), not the device's own Off mode
+        svc.GetOrCreateSetting(d).On = false;
+        Assert.True((await svc.ApplyDeviceAsync(d)).Ok);
+        await BackendTests.WaitFor(() => srv.Snapshot().Count(p => p.Pkt == OpenRgbProtocol.UpdateLeds) >= 2);
+        var leds = srv.Snapshot().Last(p => p.Pkt == OpenRgbProtocol.UpdateLeds).Payload;
+        Assert.All(leds.Skip(6), x => Assert.Equal(0, x));
+    }
+
+    [Fact]
     public async Task PerLedColourEffectSendsColourViaLeds()
     {
         var dev = FakeOpenRgbServer.SampleStripWithStatic();

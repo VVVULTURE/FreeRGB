@@ -150,7 +150,32 @@ public sealed class LightingService : IAsyncDisposable
     private static ModeInfo? StaticMode(DeviceInfo d) =>
         d.Modes.FirstOrDefault(m => m.Name.Equals("Static", StringComparison.OrdinalIgnoreCase) && m.HasModeColor && m.ColorsMin <= 1 && m.ColorsMax >= 1);
 
-    public static bool CanStatic(DeviceInfo d) => d.DirectMode is not null || StaticMode(d) is not null;
+    /// <summary>
+    /// A hardware "Static" mode that takes its colours from the LEDs (per-LED colour) rather than from the mode itself.
+    /// Verified on real hardware (ASRock Polychrome USB): such a board held the colour and drove addressable headers, while a
+    /// single Direct-mode packet did not (Direct needs a continuous stream on some devices).
+    /// </summary>
+    private static ModeInfo? PerLedStaticMode(DeviceInfo d) =>
+        d.Modes.FirstOrDefault(m => m.Name.Equals("Static", StringComparison.OrdinalIgnoreCase) && m.HasPerLed && !m.HasModeColor);
+
+    public static bool CanStatic(DeviceInfo d) => d.DirectMode is not null || StaticMode(d) is not null || PerLedStaticMode(d) is not null;
+
+    /// <summary>
+    /// Puts the device in the mode used for one-shot colours: hardware Static (per-LED) when the device has it, else Direct.
+    /// Software effects stream continuously and always use Direct.
+    /// </summary>
+    private async Task ActivateColourModeAsync(DeviceInfo d, CancellationToken ct)
+    {
+        var st = PerLedStaticMode(d);
+        if (st is not null)
+        {
+            var m = st.Clone();
+            if (m.HasBrightness) m.Brightness = m.BrightnessMax;   // we pre-scale the colours ourselves
+            await _backend.SetModeAsync(d, d.Modes.IndexOf(st), m, ct);
+            return;
+        }
+        await ActivateDirectAsync(d, ct);
+    }
 
     /// <summary>Which controls make sense for the device's currently selected effect.</summary>
     public static (bool Speed, bool Brightness, bool Color) ControlsFor(DeviceInfo d, string effect)
@@ -205,7 +230,7 @@ public sealed class LightingService : IAsyncDisposable
         if (s.Effect == EffectNames.Static)
         {
             if (!s.On) return await OffAsync(d, ct);
-            var hasZones = s.Zones.Count > 0 && d.DirectMode is not null && d.Zones.Count > 0;
+            var hasZones = s.Zones.Count > 0 && (d.DirectMode is not null || PerLedStaticMode(d) is not null) && d.Zones.Count > 0;
             if (hasZones) return await ZonedAsync(d, s, color, bright, ct);
             var sm = StaticMode(d);
             if (sm is not null)
@@ -281,7 +306,7 @@ public sealed class LightingService : IAsyncDisposable
                 await _backend.RescanAsync(ct);
                 d = _backend.Devices.FirstOrDefault(x => x.Id == d.Id) ?? d;
             }
-            await ActivateDirectAsync(d, ct);
+            await ActivateColourModeAsync(d, ct);
             for (int i = 0; i < d.Zones.Count; i++)
             {
                 var zone = d.Zones[i];
@@ -310,8 +335,8 @@ public sealed class LightingService : IAsyncDisposable
 
     private async Task<ApplyResult> SolidAsync(DeviceInfo d, Rgb c, CancellationToken ct)
     {
-        if (d.DirectMode is null) return new(d.Id, false, $"{d.Name}: no static or direct mode available.");
-        await ActivateDirectAsync(d, ct);
+        if (d.DirectMode is null && PerLedStaticMode(d) is null) return new(d.Id, false, $"{d.Name}: no static or direct mode available.");
+        await ActivateColourModeAsync(d, ct);
         var frame = new Rgb[d.LedCount];
         Array.Fill(frame, c);
         await _backend.SetLedsAsync(d, frame, ct);
@@ -320,14 +345,21 @@ public sealed class LightingService : IAsyncDisposable
 
     private async Task<ApplyResult> OffAsync(DeviceInfo d, CancellationToken ct)
     {
+        // Black through the colour path first: on the ASRock board the device's own "Off" mode did not darken fans on its headers,
+        // whereas black colour data did. Fall back to the device's Off mode only when there is no colour path.
+        if (d.DirectMode is not null || PerLedStaticMode(d) is not null)
+        {
+            var r = await SolidAsync(d, Rgb.Black, ct);
+            return r.Ok ? new(d.Id, true, $"{d.Name}: off.") : r;
+        }
         var off = d.Modes.FirstOrDefault(m => m.Name.Equals("Off", StringComparison.OrdinalIgnoreCase));
         if (off is not null) { await _backend.SetModeAsync(d, d.Modes.IndexOf(off), off.Clone(), ct); return new(d.Id, true, $"{d.Name}: off."); }
-        return await SolidAsync(d, Rgb.Black, ct);
+        return new(d.Id, false, $"{d.Name}: no way to turn this device off.");
     }
 
     private async Task<ApplyResult> ZonedAsync(DeviceInfo d, DeviceSetting s, Rgb baseColor, double bright, CancellationToken ct)
     {
-        await ActivateDirectAsync(d, ct);
+        await ActivateColourModeAsync(d, ct);
         for (int zi = 0; zi < d.Zones.Count; zi++)
         {
             var z = d.Zones[zi];
