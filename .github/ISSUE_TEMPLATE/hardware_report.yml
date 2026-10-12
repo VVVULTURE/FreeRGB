@@ -1,0 +1,21 @@
+name: Hardware test report
+description: Tell us whether a specific device worked
+labels: [hardware]
+body:
+  - type: input
+    attributes: {label: Device manufacturer and model}
+    validations: {required: true}
+  - type: input
+    attributes: {label: Firmware / hardware revision (if known)}
+  - type: input
+    attributes: {label: Connection (USB, motherboard header, SMBus/I2C, ...)}
+  - type: input
+    attributes: {label: OS and OpenRGB version}
+    validations: {required: true}
+  - type: dropdown
+    attributes:
+      label: Result
+      options: [Works fully, Works partially, Detected but not controllable, Not detected]
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: Features tested (static colour, brightness, effects, zones) and notes}

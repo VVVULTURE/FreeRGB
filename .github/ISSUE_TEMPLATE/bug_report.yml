@@ -1,0 +1,21 @@
+name: Bug report
+description: Something doesn't work
+labels: [bug]
+body:
+  - type: input
+    attributes: {label: FreeRGB version, description: "Window title bar / release tag"}
+    validations: {required: true}
+  - type: input
+    attributes: {label: Operating system and desktop environment}
+    validations: {required: true}
+  - type: textarea
+    attributes:
+      label: What happened and what did you expect?
+    validations: {required: true}
+  - type: textarea
+    attributes:
+      label: Diagnostics
+      description: "Open the Diagnostics tab, click 'Copy to clipboard', paste here. Review it first — it lists your device names and serial numbers."
+      render: text
+  - type: textarea
+    attributes: {label: Other RGB software installed (SignalRGB, iCUE, Armoury Crate, ...)}
