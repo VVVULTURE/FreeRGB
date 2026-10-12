@@ -84,6 +84,7 @@ jobs:
           Start-Sleep 2
           if (Test-Path "$dir\FreeRGB.exe") { throw "uninstall left FreeRGB.exe behind" }
           Write-Host "portable + install + uninstall OK"
+          $global:LASTEXITCODE = 0   # --diagnose exits 1 when OpenRGB is not running; that is expected here
 
       - uses: actions/upload-artifact@v4
         with:
@@ -145,7 +146,8 @@ jobs:
             apt-get install -y -qq /pkg/freergb_'"$V"'_amd64.deb
             export FREERGB_DATA_DIR=/tmp/fr
             out=$(freergb --diagnose || true); echo "$out"; echo "$out" | grep -q "OpenRGB SDK server:"
-            missing=$(for f in /opt/freergb/FreeRGB /opt/freergb/*.so; do ldd "$f" 2>&1 | grep "not found" || true; done)
+            # liblttng-ust is an optional .NET tracing library (libcoreclrtraceptprovider.so); the app runs without it.
+            missing=$(for f in /opt/freergb/FreeRGB /opt/freergb/*.so; do ldd "$f" 2>&1 | grep "not found" | grep -v "liblttng-ust" || true; done)
             if [ -n "$missing" ]; then echo "MISSING LIBRARIES:"; echo "$missing"; exit 1; fi
             dpkg -L freergb | head -20
             apt-get remove -y -qq freergb && test ! -e /opt/freergb/FreeRGB && echo "deb install + remove OK"
