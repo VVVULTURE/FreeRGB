@@ -26,6 +26,7 @@ Date 2026-10-12.
 | Manufacturer / model | Revision / firmware | Connection | Backend | Verified (observed) | Not verified / limits |
 |---|---|---|---|---|---|
 | Logitech G502 HERO | not reported by OpenRGB | USB HID `046D:C08B` | OpenRGB 1.0 SDK | static red, green, blue, orange, white; brightness scaling (25 % white visibly dim); lighting **off**; per-zone colours (Primary / Logo zones different); hardware **Spectrum Cycle**; hardware **Breathing** (red), after fixing a bug found by this test | software "Rainbow": a cycling rainbow incl. the side lights was seen, but the owner could not tell it apart from Spectrum Cycle, so it is not separately confirmed. GUI not used for this run. Speed slider not checked visually. |
+| Team Group T-Force UD5-5600 ×2 (OpenRGB: "ENE DRAM", 8 LEDs each) | not reported | SMBus/I²C, addresses 0x70 and 0x72 (Intel i801 via PawnIO 2.2.0) | OpenRGB 1.0 SDK, run elevated | static red, green, blue, dim white (25 %), white, **off**, orange; hardware **Spectrum Cycle**; hardware **Breathing** (red). Both sticks reacted together. | Per-stick control, speed, and the other modes (Flashing, Rainbow, Chase…) not tried. A first run was reported with off/orange swapped; a slower retest (8 s steps) matched exactly white → dark → orange, so the first report was an observation slip, but it was not re-checked with a timer. GUI not used. |
 
 Status: **Verified** for the features in the "Verified" column; everything else **Untested**.
 
@@ -51,7 +52,7 @@ Identified from Windows device enumeration. Only the G502 HERO has a verified re
 | Device | Category | Connection | Notes |
 |---|---|---|---|
 | ASRock B760M-HDV/M.2 | Motherboard | USB HID `26CE:01A2` | OpenRGB registered it (162 LEDs, 4 zones: 2 RGB headers, 2 addressable headers with 80 LEDs each) and accepted every FreeRGB command, but nothing visible is connected to the headers on the dev machine, so there is no visual result. Untested. |
-| Team Group T-Force UD5-5600 ×2 | RAM | SMBus/I²C | After installing PawnIO, OpenRGB detects two "ENE DRAM" controllers (8 LEDs each, `Direct` mode; FreeRGB lists them as controllable, verified through the FreeRGB-launched headless setup). **No lighting command has been sent to them yet**, so Untested. |
+| Team Group T-Force UD5-5600 ×2 | RAM | SMBus/I²C | **Verified** (see above). |
 | Logitech G502 HERO | Mouse | USB HID `046D:C08B` | **Verified** (see above). |
 | Logitech G432 headset | Headset | USB HID `046D:0A9C` | No matching OpenRGB detector name seen in its list. Untested. |
 | NVIDIA GeForce RTX 5070 | GPU | NVAPI I²C | OpenRGB registered an "Nvidia NvAPI I2C" interface for it; no device reported. Untested. |

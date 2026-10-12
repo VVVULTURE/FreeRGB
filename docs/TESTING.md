@@ -4,7 +4,7 @@
 dotnet test FreeRGB.slnx
 ```
 
-## What the automated tests cover (50 tests, xUnit)
+## What the automated tests cover (52 tests, xUnit)
 
 All hardware-facing tests run against `FakeOpenRgbServer`, an in-process **simulation** of an OpenRGB SDK server.
 They prove FreeRGB's protocol handling and logic. They do **not** prove any real device works.
@@ -16,6 +16,7 @@ They prove FreeRGB's protocol handling and logic. They do **not** prove any real
 | Backend | unavailable when nothing listens; empty device list is "connected"; negotiation down to server version; server that never answers the version request → protocol 0; connection drop is reported, reconnect works; `DEVICE_LIST_UPDATED` triggers rescan; out-of-range values rejected before sending |
 | Lighting | static colour via Static mode; off on Direct-only device sends black; hardware speed maps onto an inverted device range (found a real bug); per-LED-colour hardware effect sends its colour via LEDs (found on real hardware); unsupported effect rejected and not sent; device with no LEDs reported "detected, not controllable"; software effect streams frames then stops its timer; settings for an absent device are kept and applied when it appears; effect list reflects real capabilities |
 | Zones | saved LED count resizes an addressable header (device had 0 LEDs), rescans, then applies colour with the new count; out-of-range / non-resizable resize rejected |
+| LED-count wizard | search finds every count 0–100 in ≤ 7 questions and never probes a non-existent LED; probe sizes the zone to max and lights exactly one LED |
 | Profiles | save/load, export/import (no silent overwrite), 8 invalid-input cases rejected, oversized file rejected, names cannot escape the store directory, settings normalisation rejects non-loopback hosts |
 | Platform | XDG desktop entry content; Windows HKCU Run key round-trip (throwaway value name); second instance refused and signals the first; lock released on exit |
 

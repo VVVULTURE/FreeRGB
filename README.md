@@ -4,8 +4,8 @@ A free, open-source, lightweight RGB lighting controller for **Windows 11** and 
 pick a device, pick a colour or effect, done. No account, no telemetry, no manufacturer-specific app per component.
 
 > **Status: early / pre-release.** The application, profile system, tray/startup behaviour and OpenRGB integration are
-> implemented and tested against a *simulated* OpenRGB server and a real OpenRGB 1.0 server. **Exactly one physical
-> device (Logitech G502 HERO) has been hardware-verified so far**, through the Core API rather than the GUI — see
+> implemented and tested against a *simulated* OpenRGB server and a real OpenRGB 1.0 server. **Two kinds of physical
+> device (Logitech G502 HERO mouse, ENE-based DDR5 RAM) have been hardware-verified so far**, through the Core API rather than the GUI — see
 > [Verified & unverified](#verified--unverified) and [docs/HARDWARE.md](docs/HARDWARE.md). Don't treat any other hardware
 > as supported until it appears as *Verified* there.
 
@@ -44,7 +44,7 @@ over a documented network protocol; FreeRGB contains none of its code.
 
 **Addressable (ARGB) headers:** hardware can't tell how many LEDs are plugged in. In the device's *Zones* section, enter the LED
 count per header (e.g. what your fans have in total). FreeRGB saves it in your profile and applies it automatically, so OpenRGB's
-"Zone Initialization" dialog never needs to be used. Leave it at the real number: a wrong count wastes data or leaves LEDs dark.
+"Zone Initialization" dialog never needs to be used. Don't know the count? Click *Find automatically…*: FreeRGB lights one LED at a time and asks if you can see it (about 7 yes/no questions), then asks you to confirm. A wrong count wastes data or leaves LEDs dark. Note: Molex only *powers* fan lights; colour control needs the separate small ARGB/RGB cable from the fans or the case's hub to the motherboard.
 
 What OpenRGB needs for some devices (not FreeRGB): on Windows, RAM and many motherboards need OpenRGB's PawnIO
 driver (one-time administrator approval); on Linux, udev rules (and `i2c-dev` for SMBus). Details:
@@ -107,9 +107,9 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 
 | Verified | Evidence |
 |---|---|
-| 50 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
+| 52 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
 | Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates devices | `FreeRGB --diagnose` |
-| Logitech G502 HERO: static colours, brightness, off, zones, Spectrum Cycle, Breathing, as seen by the owner | [docs/HARDWARE.md](docs/HARDWARE.md) |
+| Logitech G502 HERO and 2× Team Group DDR5 RAM (ENE): static colours, brightness, off, Spectrum Cycle, Breathing (+ zones on the mouse), as seen by the owner | [docs/HARDWARE.md](docs/HARDWARE.md) |
 | Windows 11: app starts; `--minimized` shows no window; second launch raises the existing window; close-to-tray hides, tray-off exits cleanly and releases the lock | scripted run, worklog |
 | Windows 11: HKCU Run entry written/removed correctly | unit test |
 | Idle / effect CPU & memory | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |

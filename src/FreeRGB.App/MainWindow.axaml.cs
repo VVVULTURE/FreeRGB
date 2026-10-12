@@ -222,8 +222,10 @@ public partial class MainWindow : Window
         ZoneList.Children.Clear();
         bool colourZones = d.Zones.Count >= 2 && d.DirectMode is not null;
         if (!colourZones && !d.Zones.Any(z => z.Resizable)) return;
-        foreach (var z in d.Zones)
+        for (int zi = 0; zi < d.Zones.Count; zi++)
         {
+            var z = d.Zones[zi];
+            var zoneIndex = zi;
             var zoneName = z.Name;
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             row.Children.Add(new TextBlock { Text = z.Resizable ? z.Name : $"{z.Name} ({z.LedsCount} LEDs)", Width = 220, VerticalAlignment = VerticalAlignment.Center });
@@ -240,6 +242,9 @@ public partial class MainWindow : Window
                 };
                 row.Children.Add(count);
                 row.Children.Add(new TextBlock { Text = "LEDs connected", Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center });
+                var find = new Button { Content = "Find automatically\u2026" };
+                find.Click += async (_, _) => await FindLedCountAsync(d, zoneIndex, count);
+                row.Children.Add(find);
             }
             if (colourZones)
             {
@@ -568,5 +573,85 @@ public partial class MainWindow : Window
             ((IProgress<string>)progress).Report("Setup failed: " + ex.Message);
         }
         finally { SetupBusy.IsVisible = false; SetupBtn.IsEnabled = true; UpdateSetupStatus(); }
+    }
+
+    // ---- LED-count wizard ----------------------------------------------------------------------------
+    /// <summary>
+    /// Addressable headers cannot report their LED count, so we light single LEDs and ask. Every question is a yes/no about
+    /// what the user can see; the result is only written to the profile if they confirm it.
+    /// </summary>
+    private async Task FindLedCountAsync(DeviceInfo device, int zoneIndex, NumericUpDown field)
+    {
+        var zone = device.Zones[zoneIndex];
+        var text = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 440 };
+        var yes = new Button { Content = "Yes", MinWidth = 90 };
+        var no = new Button { Content = "No", MinWidth = 90 };
+        var cancel = new Button { Content = "Cancel", MinWidth = 90 };
+        var bar = new ProgressBar { Minimum = 0, Maximum = 7, Value = 0, Width = 440 };
+        var dlg = new Window
+        {
+            Title = $"Find LED count \u2014 {zone.Name}", Width = 500, Height = 290, CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(18), Spacing = 14,
+                Children = { text, bar, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { yes, no, cancel } } },
+            },
+        };
+        TaskCompletionSource<bool?>? pending = null;
+        Task<bool?> Ask(string q, string yesText = "Yes", string noText = "No")
+        {
+            text.Text = q; yes.Content = yesText; no.Content = noText;
+            pending = new TaskCompletionSource<bool?>();
+            return pending.Task;
+        }
+        yes.Click += (_, _) => pending?.TrySetResult(true);
+        no.Click += (_, _) => pending?.TrySetResult(false);
+        cancel.Click += (_, _) => dlg.Close();
+        dlg.Closed += (_, _) => pending?.TrySetResult(null);
+
+        int? result = null;
+        dlg.Opened += async (_, _) =>
+        {
+            try
+            {
+                var white = new Rgb(255, 255, 255);
+                var d = await _host.Lighting.ProbeZoneAsync(device, zoneIndex, null, white);
+                var max = (int)d.Zones[zoneIndex].LedsMax;
+                var any = await Ask($"\"{zone.Name}\" is now sending WHITE to up to {max} LEDs.\n\nIs anything connected to this header (your fans / strip) lit white right now?");
+                if (any is null) return;
+                if (any == false)
+                {
+                    await Ask("Nothing responded. This header is probably not connected to your fans: their control cable (a small 3-pin ARGB cable from the case's RGB hub or the fans) may be plugged into the other addressable header, or not into the motherboard at all. Molex only supplies power to the lights.\n\nSet the count to 0 for now?", "Set to 0", "Leave unchanged");
+                    result = 0; return;
+                }
+                var search = new LedCountSearch(max);
+                while (!search.Done)
+                {
+                    bar.Value = 7 - search.QuestionsLeft;
+                    d = await _host.Lighting.ProbeZoneAsync(d, zoneIndex, search.NextProbe, white);
+                    var visible = await Ask("Look at all the lights on this header. Is exactly ONE white LED lit right now?\n(It moves each time. If everything is dark, answer No.)");
+                    if (visible is null) return;
+                    search.Answer(visible.Value);
+                }
+                bar.Value = 7;
+                if (search.Result == 0) { await Ask("No LED was ever visible, so the count is 0.", "OK", "OK"); result = 0; return; }
+                d = await _host.Lighting.ProbeZoneAsync(d, zoneIndex, search.Result - 1, white);
+                var ok = await Ask($"Result: {search.Result} LEDs.\n\nTo confirm: only the LAST LED of your last fan/strip should be lit now. Is that right?", "Yes, save " + search.Result, "No");
+                if (ok == true) result = search.Result;
+                else if (ok == false) text.Text = "Not saved. You can also type the number yourself.";
+            }
+            catch (Exception ex) when (ex is IOException or TimeoutException or ArgumentException or InvalidOperationException)
+            {
+                ShowStatus("LED-count wizard stopped: " + ex.Message, warn: true);
+            }
+            finally { dlg.Close(); }
+        };
+        await dlg.ShowDialog(this);
+
+        // Put the device back to its saved state; apply the found count if the user confirmed it.
+        if (result is { } n) field.Value = n;   // triggers the normal save + apply path
+        else if (_selected is not null) await _host.Lighting.ApplyDeviceAsync(_selected);
+        if (result is { } found) ShowStatus($"{zone.Name}: {found} LEDs saved.");
     }
 }

@@ -264,6 +264,41 @@ public sealed class LightingService : IAsyncDisposable
         return _backend.Devices.FirstOrDefault(x => x.Id == d.Id) ?? d;
     }
 
+    /// <summary>
+    /// Lights a zone for the LED-count wizard: the zone is first sized to its maximum, then either every LED
+    /// (<paramref name="onlyLed"/> null) or exactly one LED is lit; other zones are blanked. Returns the refreshed device.
+    /// </summary>
+    public async Task<DeviceInfo> ProbeZoneAsync(DeviceInfo d, int zoneIndex, int? onlyLed, Rgb color, CancellationToken ct = default)
+    {
+        await _applyLock.WaitAsync(ct);
+        try
+        {
+            StopSoftware(d.Id);
+            var z = d.Zones[zoneIndex];
+            if (z.Resizable && z.LedsCount != z.LedsMax)
+            {
+                await _backend.ResizeZoneAsync(d, zoneIndex, (int)z.LedsMax, ct);
+                await _backend.RescanAsync(ct);
+                d = _backend.Devices.FirstOrDefault(x => x.Id == d.Id) ?? d;
+            }
+            await ActivateDirectAsync(d, ct);
+            for (int i = 0; i < d.Zones.Count; i++)
+            {
+                var zone = d.Zones[i];
+                if (zone.LedsCount == 0) continue;
+                var frame = new Rgb[zone.LedsCount];
+                if (i == zoneIndex)
+                {
+                    if (onlyLed is { } k) { if (k >= 0 && k < frame.Length) frame[k] = color; }
+                    else Array.Fill(frame, color);
+                }
+                await _backend.SetZoneLedsAsync(d, i, frame, ct);
+            }
+            return d;
+        }
+        finally { _applyLock.Release(); }
+    }
+
     private static uint Lerp(uint a, uint b, int pct) => (uint)Math.Round(a + (b - (double)a) * Math.Clamp(pct, 0, 100) / 100.0);
 
     private async Task ActivateDirectAsync(DeviceInfo d, CancellationToken ct)

@@ -345,6 +345,46 @@ public class LightingTests
     }
 }
 
+public class LedCountSearchTests
+{
+    [Fact]
+    public void FindsEveryCountFrom0To100WithinSevenQuestions()
+    {
+        for (int count = 0; count <= 100; count++)
+        {
+            var search = new LedCountSearch(100);
+            int questions = 0;
+            while (!search.Done)
+            {
+                var k = search.NextProbe;
+                Assert.InRange(k, 0, 99);              // never asks about a non-existent index
+                search.Answer(visible: k < count);     // LED k is visible exactly when k < count
+                questions++;
+            }
+            Assert.Equal(count, search.Result);
+            Assert.True(questions <= 7, $"count {count} needed {questions} questions");
+        }
+    }
+
+    [Fact]
+    public async Task ProbeLightsExactlyOneLedAndSizesZoneToMax()
+    {
+        var srv = new FakeOpenRgbServer().Start();
+        srv.Devices.Add(FakeOpenRgbServer.SampleBoardWithAddressableHeader());
+        await using var _s = srv;
+        await using var b = new OpenRgbBackend("127.0.0.1", srv.Port);
+        await b.ConnectAsync();
+        await using var svc = new LightingService(b, new Profile());
+        var d = await svc.ProbeZoneAsync(b.Devices[0], 0, onlyLed: 3, new Rgb(255, 255, 255));
+        Assert.Equal(100u, d.Zones[0].LedsCount);
+        await BackendTests.WaitFor(() => srv.Snapshot().Any(p => p.Pkt == OpenRgbProtocol.UpdateZoneLeds));
+        var payload = srv.Snapshot().Last(p => p.Pkt == OpenRgbProtocol.UpdateZoneLeds).Payload;
+        var colours = payload.AsSpan(10);              // size(4) zone(4) count(2)
+        Assert.Equal(400, colours.Length);
+        for (int i = 0; i < 100; i++) Assert.Equal(i == 3 ? 255 : 0, colours[i * 4]);
+    }
+}
+
 public class ProfileTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "freergb-test-" + Guid.NewGuid().ToString("N"));

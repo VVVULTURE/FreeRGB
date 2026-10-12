@@ -80,6 +80,15 @@ build PawnIO/other dependencies into FreeRGB.
   both RAM modules (8 LEDs each), log "PawnIO initialized successully".
 * Not done: clicking the GUI button; a sign-out/in cycle with the task; sending any light command to RAM.
 
+### Update - LED-count wizard, RAM test
+
+* Owner's fans are powered by Molex and the case is off-brand; the LED count of addressable headers cannot be read from hardware.
+  New: `LedCountSearch` (binary search, <= 7 yes/no answers for 0-100 LEDs; unit test checks every count 0..100) and
+  `LightingService.ProbeZoneAsync` (zone sized to max, exactly one LED lit, other zones blanked), surfaced in the GUI as
+  *Zones -> Find automatically...* with a "is anything connected?" pre-check and a final confirmation. GUI wizard not yet run on real hardware.
+* RAM test (2 x ENE DRAM, via FreeRGB.HwTest, owner watching): static colours, dim white, off, orange, Spectrum Cycle, Breathing seen;
+  first report had off/orange swapped, retest in 8 s steps matched exactly. See docs/HARDWARE.md.
+
 ## Phase 5: OS integration (Windows ✔, Linux unverified)
 
 ✔ (scripted, Windows 11, final code):
