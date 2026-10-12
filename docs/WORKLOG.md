@@ -95,6 +95,22 @@ build PawnIO/other dependencies into FreeRGB.
   devices, selecting the ASRock board works, the Zones section renders. Zones moved directly under Effect and opens by default.
   Lesson: GUI had only been tested with an empty device list before.
 
+### Update - ASRock fans, solo mode, case fans
+
+* Owner: BIOS sets the fans to white; only the two CPU-cooler fans ever reacted, not the three case fans.
+* Found by experiment (owner watching): hardware **Static** works and overrides the BIOS white; Direct mode did not change the fans (first
+  "Direct red works" reading was a leftover from the previous Static step). Fix: solid colours and off now use hardware Static (per-LED
+  Static) when a device has it (`PerLedStaticMode`), black = off (the board's own Off mode didn't darken the fans).
+* Per-header isolation (one header red, others dark, left on until answered): CPU fan 1 = Addressable Header 1, CPU fan 2 = Addressable
+  Header 2; RGB LED 1/2: no fan. Hardware Breathing, Rainbow, Wave, Strobe all changed the CPU fans.
+* LED-count wizard result was unusable: the saved log showed answers 0.15-0.6 s apart (too fast to look) and a count of 100 (the max) for
+  both headers; a ValueChanged side effect had also written 100/100 into the profile without any user action. Fixed (sizes only saved on
+  real edits/wizard confirm), answers are delayed 2.5 s, and the wizard first checks whether the header can show single LEDs at all.
+  On this board each header behaves as one colour, so the count is irrelevant for static colours and hardware effects.
+* New: Identify mode (everything else dark, per device and per header, Restore button). Unit-tested; not yet clicked by the owner.
+* Case fans: no board header reaches them, no USB RGB controller in `Get-PnpDevice` (only mouse, keyboard, headset, ASRock LED chip,
+  fingerprint reader, BT radio, storage), no case button, lighting cable goes straight to Molex => fixed-colour fans, not software-controllable.
+
 ## Phase 5: OS integration (Windows ✔, Linux unverified)
 
 ✔ (scripted, Windows 11, final code):

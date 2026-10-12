@@ -24,6 +24,7 @@ pick a device, pick a colour or effect, done. No account, no telemetry, no manuf
   (configurable); tray → *Exit* really quits.
 * **Start at sign-in**, minimised to the tray (no window pops up). Per-user, no administrator rights.
 * Single instance: launching again just raises the existing window.
+* **Identify mode**: lights one device or one header and turns everything else dark, so you can tell which fan is on which header. *Restore lighting* brings your profile back.
 * Diagnostics tab and `FreeRGB --diagnose` for missing devices, permission problems and conflicting RGB software.
 
 ## How hardware compatibility works
@@ -44,7 +45,7 @@ over a documented network protocol; FreeRGB contains none of its code.
 
 **Addressable (ARGB) headers:** hardware can't tell how many LEDs are plugged in. In the device's *Zones* section, enter the LED
 count per header (e.g. what your fans have in total). FreeRGB saves it in your profile and applies it automatically, so OpenRGB's
-"Zone Initialization" dialog never needs to be used. Don't know the count? Click *Find automatically…*: FreeRGB lights one LED at a time and asks if you can see it (about 7 yes/no questions), then asks you to confirm. A wrong count wastes data or leaves LEDs dark. Note: Molex only *powers* fan lights; colour control needs the separate small ARGB/RGB cable from the fans or the case's hub to the motherboard.
+"Zone Initialization" dialog never needs to be used. On some boards (e.g. the ASRock board used for testing) each header is driven as ONE colour and per-LED data / software effects have no visible effect; use solid colours and the board's hardware effects there. Don't know the count? Click *Find automatically…*: FreeRGB lights one LED at a time and asks if you can see it (about 7 yes/no questions), then asks you to confirm. A wrong count wastes data or leaves LEDs dark. Note: Molex only *powers* fan lights; colour control needs the separate small ARGB/RGB cable from the fans or the case's hub to the motherboard.
 
 What OpenRGB needs for some devices (not FreeRGB): on Windows, RAM and many motherboards need OpenRGB's PawnIO
 driver (one-time administrator approval); on Linux, udev rules (and `i2c-dev` for SMBus). Details:
@@ -107,7 +108,7 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 
 | Verified | Evidence |
 |---|---|
-| 52 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
+| 54 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
 | Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates devices | `FreeRGB --diagnose` |
 | Logitech G502 HERO and 2× Team Group DDR5 RAM (ENE): static colours, brightness, off, Spectrum Cycle, Breathing (+ zones on the mouse), as seen by the owner | [docs/HARDWARE.md](docs/HARDWARE.md) |
 | Windows 11: app starts; `--minimized` shows no window; second launch raises the existing window; close-to-tray hides, tray-off exits cleanly and releases the lock | scripted run, worklog |

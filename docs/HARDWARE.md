@@ -27,8 +27,17 @@ Date 2026-10-12.
 |---|---|---|---|---|---|
 | Logitech G502 HERO | not reported by OpenRGB | USB HID `046D:C08B` | OpenRGB 1.0 SDK | static red, green, blue, orange, white; brightness scaling (25 % white visibly dim); lighting **off**; per-zone colours (Primary / Logo zones different); hardware **Spectrum Cycle**; hardware **Breathing** (red), after fixing a bug found by this test | software "Rainbow": a cycling rainbow incl. the side lights was seen, but the owner could not tell it apart from Spectrum Cycle, so it is not separately confirmed. GUI not used for this run. Speed slider not checked visually. |
 | Team Group T-Force UD5-5600 ×2 (OpenRGB: "ENE DRAM", 8 LEDs each) | not reported | SMBus/I²C, addresses 0x70 and 0x72 (Intel i801 via PawnIO 2.2.0) | OpenRGB 1.0 SDK, run elevated | static red, green, blue, dim white (25 %), white, **off**, orange; hardware **Spectrum Cycle**; hardware **Breathing** (red). Both sticks reacted together. | Per-stick control, speed, and the other modes (Flashing, Rainbow, Chase…) not tried. A first run was reported with off/orange swapped; a slower retest (8 s steps) matched exactly white → dark → orange, so the first report was an observation slip, but it was not re-checked with a timer. GUI not used. |
+| ASRock B760M-HDV/M.2 (OpenRGB "Polychrome USB") | not reported | USB HID `26CE:01A2`; two 12 V RGB headers + two 5 V addressable headers; the two **CPU-cooler fans** are on *Addressable Header 1* (fan 1) and *Addressable Header 2* (fan 2) | OpenRGB 1.0 SDK | hardware **Static** colour per header (red, blue, white, dark = off), overriding the BIOS white; hardware **Breathing, Rainbow, Wave, Strobe** all visibly changed the CPU fans; per-header isolation (one header red, others dark) | **Direct per-LED mode: not observed to change the fans** (streamed 3-LED test left them white), so per-LED and software effects are not usable here; each header acts as one colour. Hardware "Spectrum Cycle" and "Off" modes did not visibly affect the fans in the first test (Spectrum Cycle not re-tested; "off" works as Static black). RGB LED 1/2 headers have nothing connected. After a reboot the BIOS white returns until FreeRGB is running again. |
 
 Status: **Verified** for the features in the "Verified" column; everything else **Untested**.
+
+### Case fans (3 ×, off-brand case) — not controllable from software
+
+Observed: none of the four board headers changed them, no USB RGB controller exists in the PC, the case has no RGB button, and
+each fan's thin lighting cable goes **straight to a Molex power adapter**. That means a built-in fixed-colour (white) light with
+no control wire. FreeRGB cannot change it. Options that need hardware: (a) replace them with ARGB fans (3-pin 5 V) and connect
+their hub/splitter to an addressable header (both are currently used by the CPU-cooler fans, so chain the cooler fans or use a
+splitter); (b) an ARGB controller/hub that OpenRGB supports; (c) unplug the Molex lighting adapter to switch their light off.
 
 ### What the first hardware pass found
 
