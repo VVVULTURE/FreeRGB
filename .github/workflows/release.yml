@@ -1,0 +1,196 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds everything and publishes a GitHub Release.
+# "Run workflow" (workflow_dispatch) builds and smoke-tests everything but does NOT create a release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the build artifacts (no leading v)'
+        default: '0.0.0-dev'
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  APPIMAGETOOL_URL: https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+  APPIMAGETOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version
+        id: v
+        shell: bash
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building version $V"
+
+      - name: Test
+        run: dotnet test FreeRGB.slnx -c Release
+
+      - name: Publish portable single-file exe
+        shell: bash
+        run: |
+          dotnet publish src/FreeRGB.App -c Release -r win-x64 --self-contained \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+            -p:PublishTrimmed=true -p:TrimMode=partial -p:Version=${{ steps.v.outputs.version }} -o artifacts/single
+          mkdir -p artifacts/release
+          cp artifacts/single/FreeRGB.exe "artifacts/release/FreeRGB-${{ steps.v.outputs.version }}-win-x64-portable.exe"
+
+      - name: Publish folder for the installer
+        shell: bash
+        run: |
+          dotnet publish src/FreeRGB.App -c Release -r win-x64 --self-contained \
+            -p:PublishTrimmed=true -p:TrimMode=partial -p:Version=${{ steps.v.outputs.version }} -o artifacts/publish/win-x64
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=${{ steps.v.outputs.version }}" "/DSourceDir=$PWD\artifacts\publish\win-x64" "/DOutputDir=$PWD\artifacts\release" installer\windows\FreeRGB.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
+          Get-ChildItem artifacts\release | Format-Table Name, Length
+
+      - name: Smoke-test portable exe, silent install and uninstall
+        shell: pwsh
+        run: |
+          $v = "${{ steps.v.outputs.version }}"
+          $env:FREERGB_DATA_DIR = "$env:RUNNER_TEMP\freergb-data"
+          # 1) portable exe starts the runtime and reports the backend state (OpenRGB is not running on the runner)
+          $out = & "artifacts\release\FreeRGB-$v-win-x64-portable.exe" --diagnose | Out-String
+          Write-Host $out
+          if ($out -notmatch 'OpenRGB SDK server:') { throw "portable exe did not produce diagnose output" }
+          # 2) silent per-user install, run the installed exe, silent uninstall
+          $dir = "$env:RUNNER_TEMP\FreeRGB-install"
+          $p = Start-Process "artifacts\release\FreeRGB-$v-win-x64-setup.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/DIR=$dir" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          if (-not (Test-Path "$dir\FreeRGB.exe")) { throw "installed exe missing" }
+          $out = & "$dir\FreeRGB.exe" --diagnose | Out-String
+          if ($out -notmatch 'OpenRGB SDK server:') { throw "installed exe did not produce diagnose output" }
+          $u = Start-Process "$dir\unins000.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
+          Start-Sleep 2
+          if (Test-Path "$dir\FreeRGB.exe") { throw "uninstall left FreeRGB.exe behind" }
+          Write-Host "portable + install + uninstall OK"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-files
+          path: artifacts/release/*
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Version
+        id: v
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then V="${GITHUB_REF_NAME#v}"; else V="${{ inputs.version }}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Test
+        run: dotnet test FreeRGB.slnx -c Release
+
+      - name: Publish (self-contained, trimmed)
+        run: |
+          dotnet publish src/FreeRGB.App -c Release -r linux-x64 --self-contained \
+            -p:PublishTrimmed=true -p:TrimMode=partial -p:Version=${{ steps.v.outputs.version }} -o artifacts/publish/linux-x64
+
+      - name: Fetch appimagetool (pinned by SHA-256)
+        run: |
+          curl -fsSL -o appimagetool "$APPIMAGETOOL_URL"
+          echo "$APPIMAGETOOL_SHA256  appimagetool" | sha256sum -c -
+          chmod +x appimagetool
+
+      - name: Build tar.gz, .deb and AppImage
+        run: |
+          APPIMAGETOOL="$PWD/appimagetool" bash installer/linux/build-linux-packages.sh \
+            artifacts/publish/linux-x64 "${{ steps.v.outputs.version }}" artifacts/release
+
+      - name: Smoke-test tar.gz and AppImage
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          export FREERGB_DATA_DIR="$RUNNER_TEMP/freergb-data"
+          mkdir t && tar -xzf "artifacts/release/FreeRGB-$V-linux-x64.tar.gz" -C t
+          out=$(t/FreeRGB/FreeRGB --diagnose || true); echo "$out"; echo "$out" | grep -q "OpenRGB SDK server:"
+          chmod +x "artifacts/release/FreeRGB-$V-linux-x64.AppImage"
+          out=$("artifacts/release/FreeRGB-$V-linux-x64.AppImage" --appimage-extract-and-run --diagnose || true); echo "$out"; echo "$out" | grep -q "OpenRGB SDK server:"
+          # GUI actually starts (virtual display) and stays up
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          xvfb-run -a bash -c "'artifacts/release/FreeRGB-$V-linux-x64.AppImage' --appimage-extract-and-run & PID=\$!; sleep 8; kill -0 \$PID && echo 'AppImage GUI still running after 8s' && kill \$PID"
+
+      - name: Smoke-test .deb in a bare Ubuntu container (checks the Depends list is sufficient)
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          docker run --rm -v "$PWD/artifacts/release:/pkg:ro" ubuntu:24.04 bash -c '
+            set -e
+            apt-get update -qq
+            apt-get install -y -qq /pkg/freergb_'"$V"'_amd64.deb
+            export FREERGB_DATA_DIR=/tmp/fr
+            out=$(freergb --diagnose || true); echo "$out"; echo "$out" | grep -q "OpenRGB SDK server:"
+            missing=$(for f in /opt/freergb/FreeRGB /opt/freergb/*.so; do ldd "$f" 2>&1 | grep "not found" || true; done)
+            if [ -n "$missing" ]; then echo "MISSING LIBRARIES:"; echo "$missing"; exit 1; fi
+            dpkg -L freergb | head -20
+            apt-get remove -y -qq freergb && test ! -e /opt/freergb/FreeRGB && echo "deb install + remove OK"
+          '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-files
+          path: artifacts/release/*
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dl
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dl
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Release notes
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          PREV=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          {
+            sed "s/__VERSION__/$V/g" .github/release-notes-header.md
+            echo
+            echo "## Changes"
+            if [ -n "$PREV" ]; then git log --pretty='- %s' "$PREV..${GITHUB_REF_NAME}"; else git log --pretty='- %s' "${GITHUB_REF_NAME}"; fi
+          } > notes.md
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          FLAGS=""
+          case "$V" in 0.*|*-*) FLAGS="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dl/* --title "FreeRGB $V" --notes-file notes.md $FLAGS

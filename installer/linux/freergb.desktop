@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=FreeRGB
+GenericName=RGB lighting control
+Comment=Lightweight RGB control for motherboards, RAM, fans and peripherals
+Exec=freergb
+Icon=freergb
+Terminal=false
+Categories=Utility;System;Settings;
+Keywords=RGB;LED;lighting;OpenRGB;
+StartupNotify=false
