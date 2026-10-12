@@ -20,6 +20,7 @@ public static class OpenRgbProtocol
     public const uint RequestProtocolVersion = 40;
     public const uint SetClientName = 50;
     public const uint DeviceListUpdated = 100;
+    public const uint ResizeZone = 1000;
     public const uint UpdateLeds = 1050;
     public const uint UpdateZoneLeds = 1051;
     public const uint UpdateSingleLed = 1052;
@@ -75,6 +76,14 @@ public static class OpenRgbProtocol
         int o = HeaderSize + 6;
         foreach (var c in colors) { buf[o++] = c.R; buf[o++] = c.G; buf[o++] = c.B; buf[o++] = 0; }
         return buf;
+    }
+
+    public static byte[] BuildResizeZone(int zoneIndex, int newSize)
+    {
+        var b = new byte[8];
+        BinaryPrimitives.WriteInt32LittleEndian(b, zoneIndex);
+        BinaryPrimitives.WriteInt32LittleEndian(b.AsSpan(4), newSize);
+        return b;
     }
 
     public static byte[] BuildUpdateZoneLeds(int zoneIndex, IReadOnlyList<Rgb> colors)

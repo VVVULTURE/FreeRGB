@@ -28,6 +28,7 @@ public sealed class AppHost : IAsyncDisposable
         Single = instance;
         Settings = AppSettings.Load(dataDir);
         Profiles = new ProfileStore(Path.Combine(dataDir, "profiles"));
+        Setup = new HardwareSetup(dataDir);
         ExePath = Environment.ProcessPath ?? "";
         StartHidden = Settings.StartMinimized && args.Contains(StartupManager.MinimizedArg);
 
@@ -47,6 +48,7 @@ public sealed class AppHost : IAsyncDisposable
     public SingleInstance Single { get; }
     public AppSettings Settings { get; }
     public ProfileStore Profiles { get; }
+    public HardwareSetup Setup { get; }
     public OpenRgbBackend Backend { get; }
     public LightingService Lighting { get; }
     public string ExePath { get; }
@@ -98,18 +100,27 @@ public sealed class AppHost : IAsyncDisposable
         });
     }
 
+    private DateTime _lastLaunchAttempt = DateTime.MinValue;
+
+    /// <summary>The OpenRGB executable to auto-launch: the user's configured path, else the one installed by Hardware setup.</summary>
+    public string? OpenRgbExeToLaunch =>
+        !string.IsNullOrWhiteSpace(Settings.OpenRgbExePath) ? Settings.OpenRgbExePath :
+        File.Exists(Setup.OpenRgbExe) ? Setup.OpenRgbExe : null;
+
     public async Task TryConnectOnceAsync()
     {
-        if (Settings.AutoLaunchOpenRgb && !string.IsNullOrWhiteSpace(Settings.OpenRgbExePath) &&
-            !await OpenRgbLauncher.IsPortOpenAsync(Settings.OpenRgbHost, Settings.OpenRgbPort, TimeSpan.FromMilliseconds(400)) &&
-            (_launchedOpenRgb is null || _launchedOpenRgb.HasExited))
+        var exe = OpenRgbExeToLaunch;
+        if (Settings.AutoLaunchOpenRgb && exe is not null && DateTime.UtcNow - _lastLaunchAttempt > TimeSpan.FromSeconds(30) &&
+            !await OpenRgbLauncher.IsPortOpenAsync(Settings.OpenRgbHost, Settings.OpenRgbPort, TimeSpan.FromMilliseconds(400)))
         {
+            _lastLaunchAttempt = DateTime.UtcNow;
             try
             {
-                _launchedOpenRgb = OpenRgbLauncher.Launch(Settings.OpenRgbExePath!, Settings.OpenRgbPort);
+                Log.Info($"OpenRGB not running; starting {exe}");
+                _launchedOpenRgb = exe == Setup.OpenRgbExe ? Setup.StartOpenRgb(Settings.OpenRgbPort) : OpenRgbLauncher.Launch(exe, Settings.OpenRgbPort);
                 await Task.Delay(2500, _cts.Token); // OpenRGB needs a moment to scan hardware before serving
             }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { StartupWarnings.Add("Could not start OpenRGB: " + ex.Message); }
+            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { Log.Error("Could not start OpenRGB", ex); StartupWarnings.Add("Could not start OpenRGB: " + ex.Message); }
         }
         await Backend.ConnectAsync(_cts.Token);
         ConnectionAttempted?.Invoke();
@@ -145,7 +156,8 @@ public sealed class AppHost : IAsyncDisposable
         await Lighting.DisposeAsync();
         await Backend.DisposeAsync();
         // Only terminate an OpenRGB we started ourselves.
-        try { if (_launchedOpenRgb is { HasExited: false }) _launchedOpenRgb.CloseMainWindow(); } catch { }
+        // (An OpenRGB started by the elevated start-up task is left running; we cannot and should not stop it.)
+        try { if (_launchedOpenRgb is { HasExited: false }) _launchedOpenRgb.Kill(); } catch { }
         _launchedOpenRgb?.Dispose();
         Single.Dispose();
         _cts.Dispose();

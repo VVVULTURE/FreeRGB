@@ -130,12 +130,9 @@ public sealed class SingleInstance : IDisposable
     }
 }
 
-/// <summary>Optionally launches OpenRGB in headless server mode when its port is closed and the user opted in.</summary>
+/// <summary>Launches OpenRGB in headless server mode when its port is closed and the user opted in.</summary>
 public static class OpenRgbLauncher
 {
-    // Flags per OpenRGB's CLI. NOTE: to be re-verified against `OpenRGB --help` of the installed version (see docs/WORKLOG.md).
-    public static readonly string[] ServerArgs = { "--server", "--noautoconnect", "--startminimized" };
-
     public static async Task<bool> IsPortOpenAsync(string host, int port, TimeSpan timeout)
     {
         try
@@ -148,12 +145,17 @@ public static class OpenRgbLauncher
         catch { return false; }
     }
 
-    public static Process? Launch(string exePath, int port)
+    /// <summary>
+    /// `--server` without `--startminimized` runs OpenRGB with no GUI at all (verified against OpenRGB 1.0: no window, port opens),
+    /// so none of its dialogs can appear. `--server-port` and `--config` are verified the same way.
+    /// </summary>
+    public static Process? Launch(string exePath, int port, string? configDir = null)
     {
         if (!File.Exists(exePath)) return null;
         var psi = new ProcessStartInfo(exePath) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(exePath)! };
-        foreach (var a in ServerArgs) psi.ArgumentList.Add(a);
-        if (port != 6742) { psi.ArgumentList.Add("--server-port"); psi.ArgumentList.Add(port.ToString()); }
+        psi.ArgumentList.Add("--server");
+        psi.ArgumentList.Add("--server-port"); psi.ArgumentList.Add(port.ToString());
+        if (configDir is not null) { Directory.CreateDirectory(configDir); psi.ArgumentList.Add("--config"); psi.ArgumentList.Add(configDir); }
         return Process.Start(psi);
     }
 }

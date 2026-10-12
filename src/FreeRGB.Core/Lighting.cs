@@ -186,6 +186,9 @@ public sealed class LightingService : IAsyncDisposable
 
         var s = GetOrCreateSetting(d);
         StopSoftware(d.Id);
+        d = await EnsureZoneSizesAsync(d, s, ct);
+        if (d.LedCount == 0)
+            return new(d.Id, false, $"{d.Name}: no LEDs are configured yet. Set the LED count of its addressable header(s) (Zones section) to the number of LEDs you have connected.");
         Rgb.TryParseHex(s.Color, out var color);
         double bright = s.Brightness / 100.0;
 
@@ -237,6 +240,28 @@ public sealed class LightingService : IAsyncDisposable
             await _backend.SetLedsAsync(d, frame, ct);
         }
         return new(d.Id, true, $"{d.Name}: {s.Effect}.");
+    }
+
+    /// <summary>
+    /// Applies saved LED counts to resizable zones (addressable headers). The backend's device list changes when a zone is
+    /// resized, so we rescan and continue with the fresh device object.
+    /// </summary>
+    private async Task<DeviceInfo> EnsureZoneSizesAsync(DeviceInfo d, DeviceSetting s, CancellationToken ct)
+    {
+        if (s.ZoneSizes.Count == 0) return d;
+        bool changed = false;
+        for (int i = 0; i < d.Zones.Count; i++)
+        {
+            var z = d.Zones[i];
+            if (!z.Resizable || !s.ZoneSizes.TryGetValue(z.Name, out var want)) continue;
+            want = (int)Math.Clamp(want, z.LedsMin, z.LedsMax);
+            if (want == z.LedsCount) continue;
+            await _backend.ResizeZoneAsync(d, i, want, ct);
+            changed = true;
+        }
+        if (!changed) return d;
+        await _backend.RescanAsync(ct);
+        return _backend.Devices.FirstOrDefault(x => x.Id == d.Id) ?? d;
     }
 
     private static uint Lerp(uint a, uint b, int pct) => (uint)Math.Round(a + (b - (double)a) * Math.Clamp(pct, 0, 100) / 100.0);

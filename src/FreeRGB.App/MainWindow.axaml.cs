@@ -1,4 +1,5 @@
 using Avalonia.Input.Platform;
+using System.Net.Http;
 using System.Text;
 using Avalonia;
 using Avalonia.Controls;
@@ -80,12 +81,14 @@ public partial class MainWindow : Window
         Tabs.SelectionChanged += (_, e) => { if (ReferenceEquals(e.Source, Tabs) && Tabs.SelectedItem == DiagTab) RefreshDiagnostics(); };
 
         SaveSettingsBtn.Click += (_, _) => SaveSettings();
+        SetupBtn.Click += async (_, _) => await RunHardwareSetupAsync();
         BrowseOpenRgbBtn.Click += async (_, _) => await BrowseOpenRgb();
 
         _host.Lighting.DevicesChanged += () => Dispatcher.UIThread.Post(RefreshDevices);
         _host.Lighting.Applied += r => Dispatcher.UIThread.Post(() => { if (!r.Ok) ShowStatus(r.Message, warn: true); });
 
         LoadSettingsUi();
+        UpdateSetupStatus();
         RefreshProfiles();
         RefreshDevices();
         foreach (var w in _host.StartupWarnings) ShowStatus(w, warn: true);
@@ -211,31 +214,48 @@ public partial class MainWindow : Window
         SpeedPanel.IsVisible = speed;
         BrightnessPanel.IsVisible = bright;
         ColorPanel.IsVisible = color;
-        ZoneExpander.IsVisible = fx == EffectNames.Static && ZoneList.Children.Count > 0;
+        ZoneExpander.IsVisible = ZoneList.Children.Count > 0;
     }
 
     private void BuildZones(DeviceInfo d, DeviceSetting set)
     {
         ZoneList.Children.Clear();
-        if (d.Zones.Count < 2 || d.DirectMode is null) return;
+        bool colourZones = d.Zones.Count >= 2 && d.DirectMode is not null;
+        if (!colourZones && !d.Zones.Any(z => z.Resizable)) return;
         foreach (var z in d.Zones)
         {
-            var box = new TextBox { Width = 110, MaxLength = 7, PlaceholderText = "(main colour)", Text = set.Zones.GetValueOrDefault(z.Name) };
             var zoneName = z.Name;
-            box.TextChanged += (_, _) =>
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            row.Children.Add(new TextBlock { Text = z.Resizable ? z.Name : $"{z.Name} ({z.LedsCount} LEDs)", Width = 220, VerticalAlignment = VerticalAlignment.Center });
+            if (z.Resizable)
             {
-                if (_loading || _selected is null) return;
-                var s = _host.Lighting.GetOrCreateSetting(_selected);
-                if (string.IsNullOrWhiteSpace(box.Text)) s.Zones.Remove(zoneName);
-                else if (Rgb.TryParseHex(box.Text, out _)) s.Zones[zoneName] = box.Text!.StartsWith('#') ? box.Text : "#" + box.Text;
-                else return;
-                ScheduleApply();
-            };
-            ZoneList.Children.Add(new StackPanel
+                // Addressable headers: the hardware cannot report how many LEDs are connected, so the user states it.
+                var count = new NumericUpDown { Minimum = z.LedsMin, Maximum = z.LedsMax, FormatString = "0", Width = 120,
+                    Value = set.ZoneSizes.TryGetValue(zoneName, out var saved) ? saved : z.LedsCount };
+                count.ValueChanged += (_, e) =>
+                {
+                    if (_loading || _selected is null || e.NewValue is null) return;
+                    _host.Lighting.GetOrCreateSetting(_selected).ZoneSizes[zoneName] = (int)e.NewValue.Value;
+                    ScheduleApply();
+                };
+                row.Children.Add(count);
+                row.Children.Add(new TextBlock { Text = "LEDs connected", Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center });
+            }
+            if (colourZones)
             {
-                Orientation = Orientation.Horizontal, Spacing = 8,
-                Children = { new TextBlock { Text = $"{z.Name} ({z.LedsCount} LEDs)", Width = 220, VerticalAlignment = VerticalAlignment.Center }, box },
-            });
+                var box = new TextBox { Width = 110, MaxLength = 7, PlaceholderText = "(main colour)", Text = set.Zones.GetValueOrDefault(zoneName) };
+                box.TextChanged += (_, _) =>
+                {
+                    if (_loading || _selected is null) return;
+                    var s = _host.Lighting.GetOrCreateSetting(_selected);
+                    if (string.IsNullOrWhiteSpace(box.Text)) s.Zones.Remove(zoneName);
+                    else if (Rgb.TryParseHex(box.Text, out _)) s.Zones[zoneName] = box.Text!.StartsWith('#') ? box.Text : "#" + box.Text;
+                    else return;
+                    ScheduleApply();
+                };
+                row.Children.Add(box);
+            }
+            ZoneList.Children.Add(row);
         }
     }
 
@@ -501,5 +521,52 @@ public partial class MainWindow : Window
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Select the OpenRGB executable", AllowMultiple = false });
         var p = files.FirstOrDefault()?.TryGetLocalPath();
         if (p is not null) OpenRgbPathBox.Text = p;
+    }
+
+    // ---- hardware setup ----------------------------------------------------------------------------
+    private void UpdateSetupStatus()
+    {
+        if (!HardwareSetup.IsSupported)
+        {
+            SetupStatusText.Text = "Automatic setup is Windows-only. On Linux install OpenRGB from your distribution and its udev rules (see docs/TROUBLESHOOTING.md).";
+            SetupBtn.IsVisible = false; SetupExplain.IsVisible = false;
+            return;
+        }
+        var st = _host.Setup.GetStatus();
+        static string Mark(bool b) => b ? "✔" : "✘";
+        SetupStatusText.Text = $"{Mark(st.OpenRgbInstalled)} OpenRGB {HardwareSetup.OpenRgbVersion} installed by FreeRGB     " +
+                               $"{Mark(st.PawnIoInstalled)} PawnIO driver     {Mark(st.ElevatedTaskRegistered)} start-up task (no prompt at sign-in)";
+        SetupBtn.Content = st.OpenRgbInstalled && st.PawnIoInstalled && st.ElevatedTaskRegistered ? "Re-run hardware setup" : "Set up hardware support";
+    }
+
+    private async Task RunHardwareSetupAsync()
+    {
+        SetupBtn.IsEnabled = false; SetupBusy.IsVisible = true;
+        var lines = new List<string>();
+        var progress = new Progress<string>(m => { lines.Add(m); SetupLog.Text = string.Join(Environment.NewLine, lines); });
+        try
+        {
+            var setup = _host.Setup;
+            var st = setup.GetStatus();
+            if (!st.OpenRgbInstalled) await setup.InstallOpenRgbAsync(progress);
+            if (!st.PawnIoInstalled || !st.ElevatedTaskRegistered)
+            {
+                var code = await setup.InstallElevatedPartsAsync(_host.Settings.OpenRgbPort, progress);
+                if (code != 0) { UpdateSetupStatus(); return; }
+            }
+            _host.Settings.AutoLaunchOpenRgb = true;
+            _host.Settings.OpenRgbExePath = null;
+            _host.SaveSettings();
+            AutoLaunchBox.IsChecked = true; OpenRgbPathBox.Text = null;
+            ((IProgress<string>)progress).Report("Starting OpenRGB and connecting…");
+            await _host.TryConnectOnceAsync();
+            ((IProgress<string>)progress).Report(_host.Backend.Status.Message);
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException or InvalidDataException or InvalidOperationException or UnauthorizedAccessException or TaskCanceledException)
+        {
+            Log.Error("Hardware setup failed", ex);
+            ((IProgress<string>)progress).Report("Setup failed: " + ex.Message);
+        }
+        finally { SetupBusy.IsVisible = false; SetupBtn.IsEnabled = true; UpdateSetupStatus(); }
     }
 }

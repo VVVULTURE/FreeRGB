@@ -113,6 +113,9 @@ public sealed class ZoneInfo
     public uint LedsCount { get; set; }
     /// <summary>Index of this zone's first LED within the device's flat LED list.</summary>
     public int FirstLed { get; set; }
+
+    /// <summary>True for zones whose LED count the user must set (e.g. addressable headers).</summary>
+    public bool Resizable => LedsMin != LedsMax;
 }
 
 /// <summary>Why a device is (or isn't) controllable. Distinguishes the cases the spec asks for.</summary>
@@ -154,10 +157,10 @@ public sealed class DeviceInfo
         Modes.FirstOrDefault(m => m.HasPerLed && m.ColorMode == ColorMode.PerLed);
 
     public Controllability Controllability =>
-        LedCount == 0 || Modes.Count == 0 ? Controllability.DetectedNotControllable : Controllability.Controllable;
+        (LedCount == 0 && !Zones.Any(z => z.Resizable)) || Modes.Count == 0 ? Controllability.DetectedNotControllable : Controllability.Controllable;
 
     public string? WhyNotControllable =>
-        LedCount == 0 ? "The backend reports this device but it exposes no LEDs." :
+        (LedCount == 0 && !Zones.Any(z => z.Resizable)) ? "The backend reports this device but it exposes no LEDs." :
         Modes.Count == 0 ? "The backend reports this device but it exposes no lighting modes." : null;
 
     public static string MakeId(string name, string serial, string location) =>

@@ -31,5 +31,6 @@ Files over 1 MiB are rejected. Import never overwrites an existing profile unles
 | `brightness`, `speed` | integers 0–100; speed is mapped onto the device's own speed range (including devices where a lower number is faster) |
 | `effect` | `"Static"`, a mode name reported by the device, or a software effect: `Software: Rainbow`, `Software: Color cycle`, `Software: Breathing`, `Software: Wave` |
 | `zones` | optional zone name → `#RRGGBB`; only used with `Static` on devices with a per-LED mode |
+| `zoneSizes` | optional zone name → LED count (0–4096) for resizable zones such as addressable headers; clamped to the device's own min/max and applied before colours |
 
 **Portable across machines:** settings for devices that aren't present are kept untouched and are applied the moment the device appears. An effect the device doesn't support is reported and *not* sent.

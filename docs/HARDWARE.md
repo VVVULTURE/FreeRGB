@@ -51,7 +51,7 @@ Identified from Windows device enumeration. Only the G502 HERO has a verified re
 | Device | Category | Connection | Notes |
 |---|---|---|---|
 | ASRock B760M-HDV/M.2 | Motherboard | USB HID `26CE:01A2` | OpenRGB registered it (162 LEDs, 4 zones: 2 RGB headers, 2 addressable headers with 80 LEDs each) and accepted every FreeRGB command, but nothing visible is connected to the headers on the dev machine, so there is no visual result. Untested. |
-| Team Group T-Force UD5-5600 ×2 | RAM | SMBus/I²C | After installing PawnIO, OpenRGB detects two "ENE DRAM" controllers (FreeRGB lists them, controllable). **No lighting command has been sent to them yet**, so Untested. |
+| Team Group T-Force UD5-5600 ×2 | RAM | SMBus/I²C | After installing PawnIO, OpenRGB detects two "ENE DRAM" controllers (8 LEDs each, `Direct` mode; FreeRGB lists them as controllable, verified through the FreeRGB-launched headless setup). **No lighting command has been sent to them yet**, so Untested. |
 | Logitech G502 HERO | Mouse | USB HID `046D:C08B` | **Verified** (see above). |
 | Logitech G432 headset | Headset | USB HID `046D:0A9C` | No matching OpenRGB detector name seen in its list. Untested. |
 | NVIDIA GeForce RTX 5070 | GPU | NVAPI I²C | OpenRGB registered an "Nvidia NvAPI I2C" interface for it; no device reported. Untested. |

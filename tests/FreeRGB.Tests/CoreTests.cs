@@ -251,6 +251,34 @@ public class LightingTests
     }
 
     [Fact]
+    public async Task SavedZoneSizeResizesAddressableHeaderThenAppliesColour()
+    {
+        var (srv, b, svc) = await Setup(FakeOpenRgbServer.SampleBoardWithAddressableHeader());
+        await using var _s = srv; await using var _b = b; await using var _l = svc;
+        var d = b.Devices[0];
+        Assert.Equal(0, d.LedCount);
+        Assert.True(d.Zones[0].Resizable);
+        var st = svc.GetOrCreateSetting(d); st.Color = "#00FF00"; st.ZoneSizes["Addressable Header 1"] = 24;
+        var r = await svc.ApplyDeviceAsync(d);
+        Assert.True(r.Ok, r.Message);
+        Assert.Contains(srv.Snapshot(), p => p.Pkt == OpenRgbProtocol.ResizeZone);
+        Assert.Equal(24, b.Devices[0].LedCount);
+        await BackendTests.WaitFor(() => srv.Snapshot().Any(p => p.Pkt == OpenRgbProtocol.UpdateLeds));
+        var leds = srv.Snapshot().Last(p => p.Pkt == OpenRgbProtocol.UpdateLeds).Payload;
+        Assert.Equal(24, BinaryPrimitives.ReadUInt16LittleEndian(leds.AsSpan(4)));
+    }
+
+    [Fact]
+    public async Task ResizeOutsideDeviceRangeIsRejected()
+    {
+        var (srv, b, svc) = await Setup(FakeOpenRgbServer.SampleBoardWithAddressableHeader());
+        await using var _s = srv; await using var _b = b; await using var _l = svc;
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => b.ResizeZoneAsync(b.Devices[0], 0, 5000));
+        var fixedZone = FakeOpenRgbServer.SampleStripWithStatic(); fixedZone.Zones[0].LedsMin = fixedZone.Zones[0].LedsMax;
+        await Assert.ThrowsAsync<ArgumentException>(() => b.ResizeZoneAsync(fixedZone, 0, 3));
+    }
+
+    [Fact]
     public async Task UnsupportedEffectIsRejectedNotSent()
     {
         var (srv, b, svc) = await Setup(FakeOpenRgbServer.SampleStripWithStatic());

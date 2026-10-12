@@ -62,6 +62,24 @@ a sequence through `LightingService`; every command returned OK, and the owner w
 restarted elevated (UAC approved). Log: "PawnIO initialized successully" (SmbusI801, SmbusNCT6793), no warning dialog.
 `FreeRGB --diagnose` now lists 4 devices: 2x ENE DRAM (I2C 0x70/0x72), G502 HERO, ASRock board. No commands were sent to the RAM.
 
+### Update - zone sizes, headless OpenRGB, one-click setup
+
+Owner screenshot: OpenRGB "Zone Initialization" dialog (addressable headers' LED counts can't be auto-detected) and a request to
+build PawnIO/other dependencies into FreeRGB.
+* Verified against OpenRGB 1.0: `OpenRGB --server --server-port N --config DIR` runs **with no window at all** (MainWindowHandle 0,
+  port opens); adding `--startminimized` opens the GUI (which is what showed both dialogs). `--server-port` and `--config` work.
+* New: SDK `RESIZEZONE` (packet 1000) via `ResizeZoneAsync`; `DeviceSetting.ZoneSizes`; applied before colours (rescan after).
+  Real server: ASRock zones 'Addressable Header 1/2' have min 0, max 100, default 80; resize to 24 gave 106 LEDs, restored to 80 -> 162.
+  A device whose only LEDs are on a 0-LED header is now "controllable, needs setup" instead of "not controllable" (found by a unit test).
+* PawnIO licence check: pawnio.eu says "(c) namazso, all rights reserved", code "open-source" without naming a licence, custom licensing
+  on request. No redistribution grant found, so **PawnIO is not embedded**; FreeRGB downloads the author's installer (winget, or
+  github.com/namazso/PawnIO.Setup 2.2.0, SHA-256 `1F519A22...3032`, Authenticode signature Valid / namazso.eu).
+* New `HardwareSetup`: downloads OpenRGB 1.0 (pinned SHA-256), one elevated script (UAC): PawnIO + scheduled task `FreeRGB-OpenRGB`
+  (highest privileges, at logon). Run end to end through a harness (not via the GUI button): hash verified, UAC approved, exit 0,
+  status all green; then `schtasks /run` (no prompt) started OpenRGB elevated and headless; `FreeRGB --diagnose` saw 4 devices incl.
+  both RAM modules (8 LEDs each), log "PawnIO initialized successully".
+* Not done: clicking the GUI button; a sign-out/in cycle with the task; sending any light command to RAM.
+
 ## Phase 5: OS integration (Windows ✔, Linux unverified)
 
 ✔ (scripted, Windows 11, final code):

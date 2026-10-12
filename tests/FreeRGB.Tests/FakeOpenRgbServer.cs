@@ -73,6 +73,16 @@ public sealed class FakeOpenRgbServer : IAsyncDisposable
                         var n = new byte[4]; BinaryPrimitives.WriteUInt32LittleEndian(n, (uint)Devices.Count);
                         await s.WriteAsync(OpenRgbProtocol.BuildPacket(0, pkt, n));
                         break;
+                    case OpenRgbProtocol.ResizeZone:
+                        {
+                            int zi = BinaryPrimitives.ReadInt32LittleEndian(payload), newSize = BinaryPrimitives.ReadInt32LittleEndian(payload.AsSpan(4));
+                            var dv = Devices[(int)dev];
+                            dv.Zones[zi].LedsCount = (uint)newSize;
+                            int total = (int)dv.Zones.Sum(z => z.LedsCount);
+                            dv.LedNames = Enumerable.Range(0, total).Select(n => $"LED {n}").ToList();
+                            dv.Colors = Enumerable.Repeat(Rgb.Black, total).ToList();
+                            break;
+                        }
                     case OpenRgbProtocol.RequestControllerData:
                         var body = SerializeDevice(Devices[(int)dev], negotiated);
                         await s.WriteAsync(OpenRgbProtocol.BuildPacket(dev, pkt, body));
@@ -127,6 +137,19 @@ public sealed class FakeOpenRgbServer : IAsyncDisposable
         OpenRgbProtocol.WriteU32(ms, (uint)(4 + body.Length));
         body.WriteTo(ms);
         return ms.ToArray();
+    }
+
+    /// <summary>A board with an addressable header whose LED count must be configured (0..100).</summary>
+    public static DeviceInfo SampleBoardWithAddressableHeader()
+    {
+        var d = SampleStripWithStatic("Test Board", "B1", 1);
+        d.Type = DeviceType.Motherboard;
+        d.Modes.RemoveAll(m => m.Name != "Direct");
+        d.Zones.Clear();
+        d.Zones.Add(new ZoneInfo { Name = "Addressable Header 1", Type = 1, LedsMin = 0, LedsMax = 100, LedsCount = 0 });
+        d.LedNames.Clear(); d.Colors.Clear();
+        d.Id = DeviceInfo.MakeId(d.Name, d.Serial, d.Location);
+        return d;
     }
 
     public static DeviceInfo SampleStripWithStatic(string name = "Test Strip", string serial = "S1", int leds = 4)

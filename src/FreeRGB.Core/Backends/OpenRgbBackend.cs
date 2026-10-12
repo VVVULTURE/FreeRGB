@@ -150,6 +150,15 @@ public sealed class OpenRgbBackend : IDeviceBackend
         return WritePacketAsync(packet, ct);
     }
 
+    public Task ResizeZoneAsync(DeviceInfo device, int zoneIndex, int newSize, CancellationToken ct = default)
+    {
+        if (zoneIndex < 0 || zoneIndex >= device.Zones.Count) throw new ArgumentOutOfRangeException(nameof(zoneIndex));
+        var z = device.Zones[zoneIndex];
+        if (!z.Resizable) throw new ArgumentException($"Zone '{z.Name}' is not resizable.", nameof(zoneIndex));
+        if (newSize < z.LedsMin || newSize > z.LedsMax) throw new ArgumentOutOfRangeException(nameof(newSize), $"Zone '{z.Name}' accepts {z.LedsMin}..{z.LedsMax} LEDs.");
+        return WriteAsync((uint)device.Handle, OpenRgbProtocol.ResizeZone, OpenRgbProtocol.BuildResizeZone(zoneIndex, newSize), ct);
+    }
+
     public Task SetZoneLedsAsync(DeviceInfo device, int zoneIndex, IReadOnlyList<Rgb> colors, CancellationToken ct = default)
     {
         if (zoneIndex < 0 || zoneIndex >= device.Zones.Count) throw new ArgumentOutOfRangeException(nameof(zoneIndex));

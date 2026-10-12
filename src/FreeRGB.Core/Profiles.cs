@@ -17,6 +17,8 @@ public sealed class DeviceSetting
     public int Speed { get; set; } = 50;
     /// <summary>Optional per-zone colours (zone name → "#RRGGBB"). Only honoured for Static.</summary>
     public Dictionary<string, string> Zones { get; set; } = new();
+    /// <summary>Optional LED counts for resizable zones such as addressable headers (zone name -> count).</summary>
+    public Dictionary<string, int> ZoneSizes { get; set; } = new();
     /// <summary>Friendly name remembered so a profile can describe devices that are currently absent.</summary>
     public string? DeviceName { get; set; }
 }
@@ -79,6 +81,10 @@ public static class ProfileValidator
             if (string.IsNullOrWhiteSpace(s.Effect) || s.Effect.Length > 128) throw new ProfileValidationException($"Device '{key}': invalid effect name.");
             s.Zones ??= new();
             if (s.Zones.Count > 256) throw new ProfileValidationException($"Device '{key}': too many zones.");
+            s.ZoneSizes ??= new();
+            if (s.ZoneSizes.Count > 256) throw new ProfileValidationException($"Device '{key}': too many zone sizes.");
+            foreach (var (zn, zs) in s.ZoneSizes)
+                if (zn.Length > 128 || zs is < 0 or > 4096) throw new ProfileValidationException($"Device '{key}': zone size for '{zn}' must be 0-4096.");
             foreach (var (zn, zc) in s.Zones)
                 if (zn.Length > 128 || !Rgb.TryParseHex(zc, out _)) throw new ProfileValidationException($"Device '{key}': invalid zone colour for '{zn}'.");
         }

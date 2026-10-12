@@ -108,6 +108,16 @@
             <CheckBox x:Name="StartMinBox" Content="When started at sign-in, don't open the window" />
             <CheckBox x:Name="CloseToTrayBox" Content="Closing the window keeps FreeRGB running in the tray (use the tray menu → Exit to quit)" />
             <Separator />
+            <TextBlock Text="Hardware setup" FontWeight="SemiBold" />
+            <TextBlock x:Name="SetupStatusText" TextWrapping="Wrap" />
+            <TextBlock x:Name="SetupExplain" TextWrapping="Wrap" Opacity="0.75" FontSize="12"
+                       Text="One click: downloads OpenRGB 1.0 (hash-checked), installs the PawnIO driver (needed only for RAM and motherboard SMBus lighting; downloaded from its author, hash-checked) and registers a start-up task so OpenRGB runs without a prompt each time. Windows asks for administrator permission once." />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button x:Name="SetupBtn" Content="Set up hardware support" />
+              <ProgressBar x:Name="SetupBusy" IsIndeterminate="True" IsVisible="False" Width="120" />
+            </StackPanel>
+            <TextBlock x:Name="SetupLog" TextWrapping="Wrap" Opacity="0.8" FontSize="12" />
+            <Separator />
             <TextBlock Text="OpenRGB (hardware backend)" FontWeight="SemiBold" />
             <TextBlock TextWrapping="Wrap" Opacity="0.8"
                        Text="FreeRGB controls hardware through OpenRGB's local SDK server (127.0.0.1 only). OpenRGB must be installed and its SDK server running." />

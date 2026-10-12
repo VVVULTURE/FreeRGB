@@ -32,9 +32,19 @@ FreeRGB does not contain device drivers. It talks to the **[OpenRGB](https://ope
 (`127.0.0.1:6742`, loopback only), and OpenRGB does the device-specific work. OpenRGB 1.0 documents support for a very
 large device list (<https://openrgb.org/devices.html>); FreeRGB's coverage is therefore OpenRGB's coverage.
 
-**You must install OpenRGB yourself** and run it with its SDK server (`OpenRGB --server`). FreeRGB can start it for you
-(Settings → OpenRGB path → *Start OpenRGB for me*) but never installs it. OpenRGB is GPL-2.0-or-later and is a separate
-program; FreeRGB talks to it over a documented network protocol and contains none of its code.
+**Windows: one-click setup.** *Settings → Hardware setup → Set up hardware support* downloads OpenRGB 1.0 (SHA-256 pinned),
+installs the PawnIO driver (only needed for RAM and motherboard SMBus lighting; via winget or the author's signed installer,
+hash pinned) and registers a scheduled task so OpenRGB starts elevated at sign-in without a prompt each time. Windows shows
+one UAC prompt. Nothing is downloaded or installed until you press the button. FreeRGB then starts OpenRGB itself
+(headless, no GUI, so none of OpenRGB's dialogs appear). Not embedded: PawnIO's site gives no redistribution terms, so FreeRGB
+fetches it from its author instead of shipping it. OpenRGB is GPL-2.0-or-later and stays a separate program that FreeRGB talks to
+over a documented network protocol; FreeRGB contains none of its code.
+
+**Linux / manual:** install OpenRGB yourself and run `OpenRGB --server` (no `--startminimized`, which opens its GUI).
+
+**Addressable (ARGB) headers:** hardware can't tell how many LEDs are plugged in. In the device's *Zones* section, enter the LED
+count per header (e.g. what your fans have in total). FreeRGB saves it in your profile and applies it automatically, so OpenRGB's
+"Zone Initialization" dialog never needs to be used. Leave it at the real number: a wrong count wastes data or leaves LEDs dark.
 
 What OpenRGB needs for some devices (not FreeRGB): on Windows, RAM and many motherboards need OpenRGB's PawnIO
 driver (one-time administrator approval); on Linux, udev rules (and `i2c-dev` for SMBus). Details:
@@ -45,8 +55,8 @@ driver (one-time administrator approval); on Linux, udev rules (and `i2c-dev` fo
 No packaged release has been published yet. Build from source (below), or download the CI build artifacts for
 `win-x64` / `linux-x64` from the GitHub Actions run of the latest commit (self-contained, no .NET install needed).
 
-1. Install and start OpenRGB with the SDK server: `OpenRGB --server --noautoconnect --startminimized`.
-2. Run `FreeRGB.exe` (Windows) or `./FreeRGB` (Linux).
+1. Windows: run `FreeRGB.exe`, open *Settings → Hardware setup* and click the button. Linux: install OpenRGB and start `OpenRGB --server`, then run `./FreeRGB`.
+2. Pick a device, set colours/effects. Addressable headers: enter the LED count under *Zones*.
 
 ### Start at sign-in
 
@@ -97,7 +107,7 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 
 | Verified | Evidence |
 |---|---|
-| 48 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
+| 50 automated tests pass on Windows (local + CI) and Linux (CI) | `dotnet test`, GitHub Actions |
 | Real OpenRGB 1.0 server accepts FreeRGB's handshake (protocol 5) and enumerates devices | `FreeRGB --diagnose` |
 | Logitech G502 HERO: static colours, brightness, off, zones, Spectrum Cycle, Breathing, as seen by the owner | [docs/HARDWARE.md](docs/HARDWARE.md) |
 | Windows 11: app starts; `--minimized` shows no window; second launch raises the existing window; close-to-tray hides, tray-off exits cleanly and releases the lock | scripted run, worklog |
@@ -109,6 +119,7 @@ Full detail and evidence in [docs/WORKLOG.md](docs/WORKLOG.md) and [docs/TESTING
 | Any other real device (ASRock board LEDs, RAM, GPU, headset); any hardware via the GUI | not done |
 | Linux UI, tray, autostart, permissions | CI only builds, runs the tests, and starts the binary under a virtual display |
 | Tray menu clicks (visual check) | not done |
+| The Hardware-setup button in the GUI (the underlying code was run end to end, see worklog) | not clicked |
 | Behaviour while another RGB program actively manages a device | not tested |
 
 ## Add a hardware integration

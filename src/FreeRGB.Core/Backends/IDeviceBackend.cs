@@ -37,6 +37,9 @@ public interface IDeviceBackend : IAsyncDisposable
     /// <summary>Sets every LED colour of a device (the device must be in a per-LED capable mode).</summary>
     Task SetLedsAsync(DeviceInfo device, IReadOnlyList<Rgb> colors, CancellationToken ct = default);
 
+    /// <summary>Sets how many LEDs a resizable zone (e.g. an addressable header) has. Callers should rescan afterwards.</summary>
+    Task ResizeZoneAsync(DeviceInfo device, int zoneIndex, int newSize, CancellationToken ct = default);
+
     /// <summary>Sets the LEDs of one zone.</summary>
     Task SetZoneLedsAsync(DeviceInfo device, int zoneIndex, IReadOnlyList<Rgb> colors, CancellationToken ct = default);
 }
