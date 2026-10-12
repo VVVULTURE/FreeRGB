@@ -74,6 +74,8 @@ public partial class MainWindow : Window
         BrightnessSlider.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) OnControlChanged(); };
         SpeedSlider.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) OnControlChanged(); };
 
+        IdentifyBtn.Click += async (_, _) => await IdentifyAsync(null);
+        RestoreBtn.Click += async (_, _) => await RestoreAsync();
         AllApplyBtn.Click += async (_, _) => await ApplyAllAsync(on: true);
         AllOffBtn.Click += async (_, _) => await ApplyAllAsync(on: false);
 
@@ -235,9 +237,12 @@ public partial class MainWindow : Window
                 // Addressable headers: the hardware cannot report how many LEDs are connected, so the user states it.
                 var count = new NumericUpDown { Minimum = z.LedsMin, Maximum = z.LedsMax, FormatString = "0", Width = 120,
                     Value = set.ZoneSizes.TryGetValue(zoneName, out var saved) ? saved : z.LedsCount };
+                // Avalonia raises ValueChanged while the control is being built/templated; only genuine user edits may save a size.
+                bool ready = false;
+                count.Loaded += (_, _) => Dispatcher.UIThread.Post(() => ready = true, DispatcherPriority.Background);
                 count.ValueChanged += (_, e) =>
                 {
-                    if (_loading || _selected is null || e.NewValue is null) return;
+                    if (!ready || _loading || _selected is null || e.NewValue is null) return;
                     _host.Lighting.GetOrCreateSetting(_selected).ZoneSizes[zoneName] = (int)e.NewValue.Value;
                     ScheduleApply();
                 };
@@ -247,6 +252,9 @@ public partial class MainWindow : Window
                 find.Click += async (_, _) => await FindLedCountAsync(d, zoneIndex, count);
                 row.Children.Add(find);
             }
+            var identify = new Button { Content = "Identify" };
+            identify.Click += async (_, _) => await IdentifyAsync(zoneIndex);
+            row.Children.Add(identify);
             if (colourZones)
             {
                 var box = new TextBox { Width = 110, MaxLength = 7, PlaceholderText = "(main colour)", Text = set.Zones.GetValueOrDefault(zoneName) };
@@ -604,6 +612,9 @@ public partial class MainWindow : Window
         {
             text.Text = q; yes.Content = yesText; no.Content = noText;
             pending = new TaskCompletionSource<bool?>();
+            // Give the person time to actually look: answers are ignored for 2.5 s after each new question.
+            yes.IsEnabled = no.IsEnabled = false;
+            _ = Task.Delay(2500).ContinueWith(_ => Dispatcher.UIThread.Post(() => yes.IsEnabled = no.IsEnabled = true));
             return pending.Task;
         }
         yes.Click += (_, _) => pending?.TrySetResult(true);
@@ -620,25 +631,39 @@ public partial class MainWindow : Window
                 var d = await _host.Lighting.ProbeZoneAsync(device, zoneIndex, null, white);
                 var max = (int)d.Zones[zoneIndex].LedsMax;
                 var any = await Ask($"\"{zone.Name}\" is now sending WHITE to up to {max} LEDs.\n\nIs anything connected to this header (your fans / strip) lit white right now?");
+                Log.Info($"LED-count wizard '{zone.Name}': anything lit at max={max}? {any}");
                 if (any is null) return;
                 if (any == false)
                 {
                     await Ask("Nothing responded. This header is probably not connected to your fans: their control cable (a small 3-pin ARGB cable from the case's RGB hub or the fans) may be plugged into the other addressable header, or not into the motherboard at all. Molex only supplies power to the lights.\n\nSet the count to 0 for now?", "Set to 0", "Leave unchanged");
                     result = 0; return;
                 }
+                // Pre-check: can this header light individual LEDs at all? Some boards drive a header as ONE colour.
+                d = await _host.Lighting.ProbeZoneAsync(d, zoneIndex, null, white, firstN: 3);
+                var partial = await Ask("Now only the FIRST 3 LEDs of this header are sent red; the rest are sent dark.\n\nIs only a SMALL part of one fan red (the rest dark)?\nAnswer No if the WHOLE fan is red, or if nothing is red.", "Only a small part", "Whole fan / nothing");
+                Log.Info($"LED-count wizard '{zone.Name}': per-LED capable? {partial}");
+                if (partial is null) return;
+                if (partial == false)
+                {
+                    await Ask("Then this board drives this header as ONE colour. The LED count doesn't matter for solid colours and hardware effects, so there's nothing to find. Nothing was changed.", "OK", "OK");
+                    return;
+                }
                 var search = new LedCountSearch(max);
                 while (!search.Done)
                 {
                     bar.Value = 7 - search.QuestionsLeft;
                     d = await _host.Lighting.ProbeZoneAsync(d, zoneIndex, search.NextProbe, white);
+                    var probeIndex = search.NextProbe;
                     var visible = await Ask("Look at all the lights on this header. Is exactly ONE white LED lit right now?\n(It moves each time. If everything is dark, answer No.)");
                     if (visible is null) return;
+                    Log.Info($"LED-count wizard '{zone.Name}': LED {probeIndex} visible={visible.Value}");
                     search.Answer(visible.Value);
                 }
                 bar.Value = 7;
                 if (search.Result == 0) { await Ask("No LED was ever visible, so the count is 0.", "OK", "OK"); result = 0; return; }
                 d = await _host.Lighting.ProbeZoneAsync(d, zoneIndex, search.Result - 1, white);
                 var ok = await Ask($"Result: {search.Result} LEDs.\n\nTo confirm: only the LAST LED of your last fan/strip should be lit now. Is that right?", "Yes, save " + search.Result, "No");
+                Log.Info($"LED-count wizard '{zone.Name}': found {search.Result}, confirmed={ok}");
                 if (ok == true) result = search.Result;
                 else if (ok == false) text.Text = "Not saved. You can also type the number yourself.";
             }
@@ -651,8 +676,36 @@ public partial class MainWindow : Window
         await dlg.ShowDialog(this);
 
         // Put the device back to its saved state; apply the found count if the user confirmed it.
-        if (result is { } n) field.Value = n;   // triggers the normal save + apply path
+        if (result is { } n && _selected is not null)
+        {
+            _host.Lighting.GetOrCreateSetting(_selected).ZoneSizes[zone.Name] = n;
+            ScheduleApply();            // also schedules the profile save
+            LoadControls();             // show the new number
+        }
         else if (_selected is not null) await _host.Lighting.ApplyDeviceAsync(_selected);
         if (result is { } found) ShowStatus($"{zone.Name}: {found} LEDs saved.");
+    }
+
+    // ---- identify / solo ---------------------------------------------------------------------------
+    private async Task IdentifyAsync(int? zoneIndex)
+    {
+        if (_selected is null) return;
+        try
+        {
+            await _host.Lighting.SoloAsync(_selected, zoneIndex, new Rgb(255, 0, 0));
+            RestoreBtn.IsVisible = true; IdentifyNote.IsVisible = true;
+            ShowStatus(zoneIndex is { } z ? $"Identify: only '{_selected.Zones[z].Name}' is lit (red); everything else is dark." : "Identify: only this device is lit (red); everything else is dark.");
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or ArgumentException or InvalidOperationException)
+        {
+            ShowStatus("Identify failed: " + ex.Message, warn: true);
+        }
+    }
+
+    private async Task RestoreAsync()
+    {
+        await _host.Lighting.EndSoloAsync();
+        RestoreBtn.IsVisible = false; IdentifyNote.IsVisible = false;
+        ShowStatus("Lighting restored from your profile.");
     }
 }

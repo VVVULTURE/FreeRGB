@@ -53,6 +53,12 @@
               <StackPanel x:Name="DeviceHeader" Spacing="2">
                 <TextBlock x:Name="DevTitle" FontSize="20" FontWeight="SemiBold" />
                 <TextBlock x:Name="DevSub" Opacity="0.7" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+                  <Button x:Name="IdentifyBtn" Content="Identify this device (everything else dark)" />
+                  <Button x:Name="RestoreBtn" Content="Restore lighting" IsVisible="False" />
+                </StackPanel>
+                <TextBlock x:Name="IdentifyNote" IsVisible="False" TextWrapping="Wrap" Opacity="0.8"
+                           Text="Identify mode: every other device and header is dark so you can see this one clearly. Nothing is saved. Press Restore lighting when done." />
                 <Border x:Name="DevWarning" IsVisible="False" Padding="10" CornerRadius="6" Background="#33FFAA00" Margin="0,6,0,0">
                   <TextBlock x:Name="DevWarningText" TextWrapping="Wrap" />
                 </Border>

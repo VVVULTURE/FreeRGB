@@ -293,7 +293,7 @@ public sealed class LightingService : IAsyncDisposable
     /// Lights a zone for the LED-count wizard: the zone is first sized to its maximum, then either every LED
     /// (<paramref name="onlyLed"/> null) or exactly one LED is lit; other zones are blanked. Returns the refreshed device.
     /// </summary>
-    public async Task<DeviceInfo> ProbeZoneAsync(DeviceInfo d, int zoneIndex, int? onlyLed, Rgb color, CancellationToken ct = default)
+    public async Task<DeviceInfo> ProbeZoneAsync(DeviceInfo d, int zoneIndex, int? onlyLed, Rgb color, CancellationToken ct = default, int? firstN = null)
     {
         await _applyLock.WaitAsync(ct);
         try
@@ -314,7 +314,8 @@ public sealed class LightingService : IAsyncDisposable
                 var frame = new Rgb[zone.LedsCount];
                 if (i == zoneIndex)
                 {
-                    if (onlyLed is { } k) { if (k >= 0 && k < frame.Length) frame[k] = color; }
+                    if (firstN is { } n) { for (int k = 0; k < Math.Min(n, frame.Length); k++) frame[k] = color; }
+                    else if (onlyLed is { } k) { if (k >= 0 && k < frame.Length) frame[k] = color; }
                     else Array.Fill(frame, color);
                 }
                 await _backend.SetZoneLedsAsync(d, i, frame, ct);
@@ -322,6 +323,54 @@ public sealed class LightingService : IAsyncDisposable
             return d;
         }
         finally { _applyLock.Release(); }
+    }
+
+    /// <summary>True while an "identify" view is showing (everything but the target is dark).</summary>
+    public bool SoloActive { get; private set; }
+
+    /// <summary>
+    /// Visual-clarity mode for testing: every other device is turned dark, and on the target device either one zone or the whole
+    /// device is lit in <paramref name="color"/> while its other zones stay dark. Profile settings are NOT changed;
+    /// <see cref="EndSoloAsync"/> restores the saved lighting.
+    /// </summary>
+    public async Task SoloAsync(DeviceInfo target, int? zoneIndex, Rgb color, CancellationToken ct = default)
+    {
+        await StopEffectsAsync();
+        // Make sure every controllable device has a saved setting so that EndSolo can restore it.
+        foreach (var dev in _backend.Devices.Where(x => x.Controllability == Controllability.Controllable)) GetOrCreateSetting(dev);
+
+        await _applyLock.WaitAsync(ct);
+        try
+        {
+            SoloActive = true;
+            foreach (var dev in _backend.Devices.Where(x => x.Controllability == Controllability.Controllable).ToArray())
+            {
+                try
+                {
+                    if (dev.Id != target.Id) { await SolidAsync(dev, Rgb.Black, ct); continue; }
+                    if (zoneIndex is null) { await SolidAsync(dev, color, ct); continue; }
+                    await ActivateColourModeAsync(dev, ct);
+                    for (int i = 0; i < dev.Zones.Count; i++)
+                    {
+                        var z = dev.Zones[i];
+                        if (z.LedsCount == 0) continue;
+                        await _backend.SetZoneLedsAsync(dev, i, Enumerable.Repeat(i == zoneIndex ? color : Rgb.Black, (int)z.LedsCount).ToArray(), ct);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or TimeoutException or ArgumentException or InvalidOperationException)
+                {
+                    Applied?.Invoke(new(dev.Id, false, $"{dev.Name}: identify failed ({ex.Message})."));
+                }
+            }
+        }
+        finally { _applyLock.Release(); }
+    }
+
+    /// <summary>Leaves identify mode and re-applies the saved lighting of every device.</summary>
+    public async Task EndSoloAsync(CancellationToken ct = default)
+    {
+        SoloActive = false;
+        await ApplyAllAsync();
     }
 
     private static uint Lerp(uint a, uint b, int pct) => (uint)Math.Round(a + (b - (double)a) * Math.Clamp(pct, 0, 100) / 100.0);

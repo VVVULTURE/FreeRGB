@@ -369,6 +369,37 @@ public class LightingTests
     }
 }
 
+public class SoloTests
+{
+    [Fact]
+    public async Task SoloDarkensOtherDevicesAndOtherZonesThenRestores()
+    {
+        var a = FakeOpenRgbServer.SampleStripWithStatic("Strip A", "A", 4);
+        var other = FakeOpenRgbServer.SampleStripWithStatic("Strip B", "B", 4);
+        var srv = new FakeOpenRgbServer().Start();
+        srv.Devices.Add(a); srv.Devices.Add(other);
+        await using var _s = srv;
+        await using var b = new OpenRgbBackend("127.0.0.1", srv.Port);
+        await b.ConnectAsync();
+        await using var svc = new LightingService(b, new Profile());
+        svc.GetOrCreateSetting(b.Devices[1]).Color = "#0000FF";   // device B has a saved blue
+        await svc.SoloAsync(b.Devices[0], null, new Rgb(255, 0, 0));
+        Assert.True(svc.SoloActive);
+        // Device B (handle 1) must have received black data, device A (handle 0) red.
+        await BackendTests.WaitFor(() => srv.Snapshot().Any(p => p.Dev == 1 && p.Pkt == OpenRgbProtocol.UpdateLeds)
+                                       && srv.Snapshot().Any(p => p.Dev == 0 && p.Pkt == OpenRgbProtocol.UpdateLeds));
+        var toB = srv.Snapshot().Last(p => p.Dev == 1 && p.Pkt == OpenRgbProtocol.UpdateLeds).Payload;
+        Assert.All(toB.Skip(6), x => Assert.Equal(0, x));                       // other device: all black
+        var toA = srv.Snapshot().Last(p => p.Dev == 0 && p.Pkt == OpenRgbProtocol.UpdateLeds).Payload;
+        Assert.Equal(new byte[] { 255, 0, 0, 0 }, toA[6..10]);                   // target: red
+        await svc.EndSoloAsync();
+        Assert.False(svc.SoloActive);
+        await BackendTests.WaitFor(() => srv.Snapshot().Any(p => p.Dev == 1 && p.Pkt == OpenRgbProtocol.UpdateMode));
+        var restoredB = srv.Snapshot().Last(p => p.Dev == 1 && p.Pkt == OpenRgbProtocol.UpdateMode).Payload;
+        Assert.Equal(new byte[] { 0, 0, 255, 0 }, restoredB[^4..]);   // saved blue is back
+    }
+}
+
 public class LedCountSearchTests
 {
     [Fact]
